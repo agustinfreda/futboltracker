@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futbol Tracker - Partidos Vistos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-futbol text-emerald-400 text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-wide text-white">Futbol<span class="text-emerald-400">Tracker</span></h1>
+            </div>
+            <nav class="flex space-x-2">
+                <button onclick="cambiarTab('inicio')" id="tab-inicio" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-emerald-500 text-white">
+                    <i class="fa-solid fa-house mr-2"></i>Inicio
+                </button>
+                <button onclick="cambiarTab('partidos')" id="tab-partidos" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700">
+                    <i class="fa-solid fa-tv mr-2"></i>Partidos Vistos
+                </button>
+                <button onclick="cambiarTab('jugadores')" id="tab-jugadores" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700">
+                    <i class="fa-solid fa-users mr-2"></i>Jugadores
+                </button>
+                <button onclick="cambiarTab('estadisticas')" id="tab-estadisticas" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700">
+                    <i class="fa-solid fa-chart-line mr-2"></i>Estadísticas
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- ================= PESTAÑA INICIO ================= -->
+        <section id="sec-inicio" class="space-y-4">
+            <div>
+                <h2 class="text-2xl font-bold text-white">Panorama General</h2>
+                <p class="text-xs text-slate-400">Resumen rápido de todo lo que tenés cargado.</p>
+            </div>
+
+            <!-- KPIs -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+                    <p id="home-kpi-partidos" class="text-2xl font-black text-white">0</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">Partidos vistos</p>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+                    <p id="home-kpi-goles" class="text-2xl font-black text-emerald-400">0</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">Goles registrados</p>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+                    <p id="home-kpi-competiciones" class="text-2xl font-black text-amber-400">0</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">Competencias registradas</p>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+                    <p id="home-kpi-equipos" class="text-2xl font-black text-sky-400">0</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">Equipos registrados</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Último partido -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-clock-rotate-left text-emerald-400 mr-2"></i>Último Partido Registrado
+                    </h3>
+                    <div id="home-ultimo-partido">
+                        <!-- Carga dinámica -->
+                    </div>
+                </div>
+
+                <!-- Goleador histórico -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-trophy text-amber-400 mr-2"></i>Top 3 Goleadores
+                    </h3>
+                    <div id="home-top-goleador">
+                        <!-- Carga dinámica -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA PARTIDOS VISTOS ================= -->
+        <section id="sec-partidos" class="space-y-4 hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-800/80 p-4 rounded-xl border border-slate-700">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Historial de Partidos Vistos</h2>
+                    <p class="text-xs text-slate-400">Listado de todos los partidos registrados y sus marcadores.</p>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <!-- Buscador de partidos -->
+                    <input type="text" id="filtro-partidos" oninput="aplicarFiltrosPartidos()" placeholder="Buscar por equipo o torneo..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 w-60">
+                    
+                    <!-- Botón para Abrir Modal de Partido -->
+                    <button onclick="abrirModalNuevoPartido()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors shadow-lg shadow-emerald-500/20 whitespace-nowrap">
+                        <i class="fa-solid fa-plus mr-1.5"></i>Registrar Partido
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="flex flex-wrap items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-slate-700/60">
+                <i class="fa-solid fa-filter text-slate-500 text-xs ml-1"></i>
+                <select id="filtro-competicion" onchange="aplicarFiltrosPartidos()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <option value="">Todas las competiciones</option>
+                </select>
+                <select id="filtro-anio" onchange="aplicarFiltrosPartidos()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <option value="">Todos los años</option>
+                </select>
+                <select id="filtro-equipo" onchange="aplicarFiltrosPartidos()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <option value="">Todos los equipos</option>
+                </select>
+                <button onclick="limpiarFiltrosPartidos()" class="text-xs text-slate-400 hover:text-white ml-1 underline">Limpiar filtros</button>
+            </div>
+
+            <!-- Listado de Tarjetas -->
+            <div id="lista-partidos" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                <!-- Carga dinámica -->
+            </div>
+        </section>
+
+
+        <!-- ================= PESTAÑA JUGADORES ================= -->
+        <section id="sec-jugadores" class="space-y-8 hidden">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i class="fa-solid fa-user-plus text-emerald-400 mr-2"></i>Registrar Nuevo Jugador
+                </h2>
+                <form id="form-jugador" onsubmit="guardarJugador(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Nombre Completo</label>
+                        <input type="text" id="j-nombre" placeholder="Ej. Edinson Cavani" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label>
+                        <input type="text" id="j-nacionalidad" placeholder="Ej. Uruguaya" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Posición</label>
+                        <input type="text" id="j-posicion" placeholder="Ej. Delantero" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Edad</label>
+                        <input type="number" id="j-edad" placeholder="Ej. 37" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">
+                            Guardar Jugador
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabla de Jugadores -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 border-b border-slate-700 flex flex-wrap justify-between items-center gap-3">
+                    <h3 class="text-lg font-bold text-white">Jugadores Registrados</h3>
+                    <div class="flex items-center gap-2">
+                        <select id="filtro-jugadores-equipo" onchange="aplicarFiltrosJugadores()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            <option value="">Todos los clubes</option>
+                        </select>
+                        <input type="text" id="buscar-tabla-jugadores" oninput="aplicarFiltrosJugadores()" placeholder="Filtrar jugadores..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 w-64">
+                    </div>
+                </div>
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-900 text-xs text-slate-400 uppercase border-b border-slate-700">
+                        <tr>
+                            <th class="px-4 py-3">ID</th>
+                            <th class="px-4 py-3">Nombre</th>
+                            <th class="px-4 py-3">Nacionalidad</th>
+                            <th class="px-4 py-3">Posición</th>
+                            <th class="px-4 py-3">Edad</th>
+                            <th class="px-4 py-3">Clubes</th>
+                            <th class="px-4 py-3 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-jugadores">
+                        <!-- Carga dinámica -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+
+        <!-- ================= PESTAÑA ESTADÍSTICAS ================= -->
+        <section id="sec-estadisticas" class="space-y-4 hidden">
+            <!-- Filtros -->
+            <div class="flex flex-wrap items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-slate-700/60">
+                <i class="fa-solid fa-filter text-slate-500 text-xs ml-1"></i>
+                <select id="stats-filtro-competicion" onchange="cargarEstadisticas()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <option value="">Todas las competiciones</option>
+                </select>
+                <select id="stats-filtro-anio" onchange="cargarEstadisticas()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <option value="">Todos los años</option>
+                </select>
+                <button onclick="limpiarFiltrosEstadisticas()" class="text-xs text-slate-400 hover:text-white ml-1 underline">Limpiar filtros</button>
+            </div>
+
+            <!-- KPIs compactos -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
+                    <p id="kpi-total-partidos" class="text-2xl font-black text-white">0</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">Partidos vistos</p>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
+                    <p id="kpi-total-goles" class="text-2xl font-black text-emerald-400">0</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">Goles totales</p>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center col-span-2 md:col-span-1">
+                    <p id="kpi-promedio-goles" class="text-2xl font-black text-amber-400">0</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">Goles por partido</p>
+                </div>
+            </div>
+
+            <!-- Grilla de 2 columnas con las 4 tarjetas de detalle -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Top Goleadores -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-trophy text-amber-400 mr-2"></i>Máximos Goleadores
+                    </h3>
+                    <div id="top-goleadores-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        <!-- Carga dinámica -->
+                    </div>
+                </div>
+
+                <!-- Top Equipos -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-shield-halved text-emerald-400 mr-2"></i>Equipos más Goleadores
+                    </h3>
+                    <div id="top-equipos-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        <!-- Carga dinámica -->
+                    </div>
+                </div>
+
+                <!-- Top Estadios -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-location-dot text-sky-400 mr-2"></i>Estadios más Visitados
+                    </h3>
+                    <div id="top-estadios-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        <!-- Carga dinámica -->
+                    </div>
+                </div>
+
+                <!-- Local vs Visitante -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-scale-balanced text-purple-400 mr-2"></i>Local vs Visitante
+                    </h3>
+                    <div id="resultado-local-visitante">
+                        <!-- Carga dinámica -->
+                    </div>
+                </div>
+
+                <!-- Goles por Tipo -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-bullseye text-rose-400 mr-2"></i>Goles por Tipo
+                    </h3>
+                    <div id="goles-por-tipo-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        <!-- Carga dinámica -->
+                    </div>
+                </div>
+
+                <!-- Equipos Más Ganadores -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-crown text-yellow-400 mr-2"></i>Equipos Más Ganadores
+                    </h3>
+                    <div id="top-victorias-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        <!-- Carga dinámica -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+
+    <!-- MODAL 1: REGISTRAR PARTIDO (POPUP) -->
+    <div id="modal-partido" class="fixed inset-0 bg-black/75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalNuevoPartido()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 id="modal-partido-titulo" class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-plus-circle text-emerald-400 mr-2"></i>Registrar Partido Visto
+            </h3>
+
+            <form onsubmit="guardarNuevoPartido(event)" class="space-y-3">
+                <input type="hidden" id="p-edit-id" value="">
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-medium text-slate-400">Competición</label>
+                        <button type="button" onclick="abrirModalCrearCompeticion()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nueva</button>
+                    </div>
+                    <select id="p-competicion-select" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <!-- Carga dinámica -->
+                    </select>
+                </div>
+
+                <!-- Selección de Equipos desde lista pre-existente -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-medium text-slate-400">Equipo Local</label>
+                            <button type="button" onclick="abrirModalCrearEquipo('local')" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
+                        </div>
+                        <select id="p-local-select" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <!-- Carga dinámica -->
+                        </select>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-medium text-slate-400">Equipo Visitante</label>
+                            <button type="button" onclick="abrirModalCrearEquipo('visitante')" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
+                        </div>
+                        <select id="p-visitante-select" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <!-- Carga dinámica -->
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-medium text-slate-400">Estadio</label>
+                        <button type="button" onclick="abrirModalCrearEstadio()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
+                    </div>
+                    <select id="p-estadio-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <option value="">Sin especificar</option>
+                        <!-- Carga dinámica -->
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-medium text-slate-400">Instancia</label>
+                            <button type="button" onclick="abrirModalCrearInstancia()" class="text-[11px] text-emerald-400 hover:underline">＋ Nueva</button>
+                        </div>
+                        <select id="p-instancia-select" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <!-- Carga dinámica -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Fecha del Partido</label>
+                        <input type="date" id="p-fecha" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <button id="p-submit-btn" type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2.5 rounded-lg text-sm transition-colors mt-2">
+                    Guardar Partido
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2: CREAR EQUIPO RÁPIDO (POPUP) -->
+    <div id="modal-crear-equipo" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalCrearEquipo()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-shield-halved text-emerald-400 mr-2"></i>Nuevo Club / Equipo
+            </h3>
+            
+            <form onsubmit="guardarEquipoRapido(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Nombre Oficial del Club</label>
+                    <input type="text" id="pop-eq-nombre" placeholder="Ej. Boca Juniors" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
+                    Guardar Club
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2b: CREAR ESTADIO RÁPIDO (POPUP) -->
+    <div id="modal-crear-estadio" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalCrearEstadio()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-building text-emerald-400 mr-2"></i>Nuevo Estadio
+            </h3>
+
+            <form onsubmit="guardarEstadioRapido(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Nombre del Estadio</label>
+                    <input type="text" id="pop-est-nombre" placeholder="Ej. La Bombonera" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Ciudad (opcional)</label>
+                    <input type="text" id="pop-est-ciudad" placeholder="Ej. Buenos Aires" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
+                    Guardar Estadio
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2c: CREAR COMPETICIÓN RÁPIDA (POPUP) -->
+    <div id="modal-crear-competicion" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalCrearCompeticion()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-trophy text-emerald-400 mr-2"></i>Nueva Competición
+            </h3>
+
+            <form onsubmit="guardarCompeticionRapida(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Nombre</label>
+                    <input type="text" id="pop-comp-nombre" placeholder="Ej. Liga Profesional" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Año / Temporada (opcional)</label>
+                    <input type="text" id="pop-comp-temporada" placeholder="Ej. 2026 o 2025/2026" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
+                    Guardar Competición
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2d: CREAR INSTANCIA RÁPIDA (POPUP) -->
+    <div id="modal-crear-instancia" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalCrearInstancia()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-list-ol text-emerald-400 mr-2"></i>Nueva Instancia
+            </h3>
+
+            <form onsubmit="guardarInstanciaRapida(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Nombre</label>
+                    <input type="text" id="pop-inst-nombre" placeholder="Ej. Fecha 5, Cuartos de Final, Final" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
+                    Guardar Instancia
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 3: CARGAR GOL -->
+    <div id="modal-gol" class="fixed inset-0 bg-black/75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalGol()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white">Cargar Gol al Partido</h3>
+            <input type="hidden" id="modal-partido-id">
+
+            <div class="relative">
+                <label class="block text-xs font-medium text-slate-400 mb-1">Buscar Jugador Autor del Gol</label>
+                <input type="text" id="gol-buscar-jugador" oninput="buscarJugadorAuto(this.value)" placeholder="Escribí el nombre del jugador..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                <input type="hidden" id="gol-jugador-id">
+                
+                <div id="desplegable-jugadores" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-48 overflow-y-auto hidden z-10 shadow-2xl"></div>
+            </div>
+
+            <div id="jugador-seleccionado-info" class="hidden bg-emerald-950/50 border border-emerald-800/50 rounded-lg p-3 text-xs text-emerald-300">
+                Jugador seleccionado: <span id="nombre-jugador-sel" class="font-bold text-white"></span>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Equipo que Anotó</label>
+                <select id="gol-equipo-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"></select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Minuto</label>
+                    <input type="text" id="gol-minuto" placeholder="Ej. 45'+2" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Tipo de Gol</label>
+                    <select id="gol-tipo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <option value="JUGADA">Jugada</option>
+                        <option value="PENAL">Penal</option>
+                        <option value="TIRO LIBRE">Tiro Libre</option>
+                        <option value="CABEZA">Cabeza</option>
+                        <option value="AUTOGOL">Autogol</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="guardarGol()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
+                Confirmar y Registrar Gol
+            </button>
+        </div>
+    </div>
+
+
+    <!-- MODAL 4: CREAR JUGADOR RÁPIDO -->
+    <div id="modal-crear-jugador-rapido" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalCrearJugadorRapido()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-user-plus text-emerald-400 mr-2"></i>Crear Nuevo Jugador
+            </h3>
+            
+            <form onsubmit="guardarJugadorRapido(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Nombre Completo</label>
+                    <input type="text" id="pop-j-nombre" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Edad</label>
+                        <input type="number" id="pop-j-edad" placeholder="Ej. 25" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label>
+                        <input type="text" id="pop-j-nacionalidad" placeholder="Ej. Argentina" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Posición</label>
+                    <input type="text" id="pop-j-posicion" placeholder="Ej. Mediocampista" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-3">
+                    Guardar y Seleccionar
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 5: EDITAR JUGADOR -->
+    <div id="modal-editar-jugador" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalEditarJugador()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-user-pen text-emerald-400 mr-2"></i>Editar Jugador
+            </h3>
+            <p class="text-[11px] text-slate-500 -mt-2">El club ya no se edita acá: se calcula solo a partir de los goles que ese jugador tiene cargados en cada partido.</p>
+
+            <form onsubmit="guardarJugadorEditado(event)" class="space-y-3">
+                <input type="hidden" id="edit-j-id">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Nombre Completo</label>
+                    <input type="text" id="edit-j-nombre" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Edad</label>
+                        <input type="number" id="edit-j-edad" placeholder="Ej. 25" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label>
+                        <input type="text" id="edit-j-nacionalidad" placeholder="Ej. Argentina" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Posición</label>
+                    <input type="text" id="edit-j-posicion" placeholder="Ej. Mediocampista" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-3">
+                    Guardar Cambios
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <script>
+        // Vacío = URL relativa: el navegador le pega al mismo origen que
+        // sirvió esta página (funciona igual en localhost que en Render,
+        // porque main.py sirve este index.html Y la API desde el mismo
+        // servidor). Si en algún momento separás frontend y backend en
+        // hosts distintos, acá va la URL completa del backend.
+        const API_URL = "";
+        let partidosMemoria = [];
+        let equiposMemoria = [];
+        let estadiosMemoria = [];
+        let campoEquipoTarget = null; // Para saber cuál selector actualizar cuando se crea un equipo rápido
+
+        // --- HELPER: fetch que revisa errores y muestra el mensaje del backend ---
+        async function apiRequest(url, options = {}) {
+            const res = await fetch(url, options);
+            if (!res.ok) {
+                let detalle = 'Ocurrió un error inesperado.';
+                try {
+                    const data = await res.json();
+                    detalle = data.detail || detalle;
+                } catch (e) { /* respuesta sin body (ej. 404 simple) */ }
+                alert(detalle);
+                throw new Error(detalle);
+            }
+            if (res.status === 204) return null;
+            return res.json();
+        }
+
+        function confirmarBorrado(mensaje) {
+            return confirm(mensaje);
+        }
+
+        // --- NAVEGACIÓN TABS ---
+        function cambiarTab(tab) {
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('header nav button').forEach(b => {
+                b.classList.remove('bg-emerald-500', 'text-white');
+                b.classList.add('text-slate-300');
+            });
+
+            document.getElementById(`sec-${tab}`).classList.remove('hidden');
+            const btn = document.getElementById(`tab-${tab}`);
+            btn.classList.add('bg-emerald-500', 'text-white');
+            btn.classList.remove('text-slate-300');
+
+            if (tab === 'inicio') cargarDashboard();
+            if (tab === 'partidos') cargarPartidos();
+            if (tab === 'jugadores') cargarJugadores();
+            if (tab === 'estadisticas') cargarEstadisticas();
+        }
+
+        // --- EQUIPOS ---
+        async function cargarEquipos() {
+            try {
+                const res = await fetch(`${API_URL}/equipos/`);
+                equiposMemoria = await res.json();
+            } catch (e) {
+                equiposMemoria = [];
+            }
+            poblarSelectsEquipos();
+        }
+
+        function poblarSelectsEquipos() {
+            const opciones = equiposMemoria.length > 0
+                ? equiposMemoria.map(e => `<option value="${e.nombre}">${e.nombre}</option>`).join('')
+                : `<option value="">Sin equipos registrados</option>`;
+
+            document.getElementById('p-local-select').innerHTML = opciones;
+            document.getElementById('p-visitante-select').innerHTML = opciones;
+        }
+
+        // --- ESTADIOS ---
+        async function cargarEstadios() {
+            try {
+                const res = await fetch(`${API_URL}/estadios/`);
+                estadiosMemoria = await res.json();
+            } catch (e) {
+                estadiosMemoria = [];
+            }
+            const opciones = estadiosMemoria.map(e => `<option value="${e.nombre}">${e.nombre}${e.ciudad ? ' — ' + e.ciudad : ''}</option>`).join('');
+            document.getElementById('p-estadio-select').innerHTML = `<option value="">Sin especificar</option>` + opciones;
+        }
+
+        function abrirModalCrearEstadio() {
+            document.getElementById('modal-crear-estadio').classList.remove('hidden');
+        }
+
+        function cerrarModalCrearEstadio() {
+            document.getElementById('modal-crear-estadio').classList.add('hidden');
+            document.getElementById('pop-est-nombre').value = '';
+            document.getElementById('pop-est-ciudad').value = '';
+        }
+
+        async function guardarEstadioRapido(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('pop-est-nombre').value.trim();
+            const ciudad = document.getElementById('pop-est-ciudad').value.trim() || null;
+            if (!nombre) return;
+
+            let estadioCreado;
+            try {
+                estadioCreado = await apiRequest(`${API_URL}/estadios/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, ciudad })
+                });
+            } catch (err) { return; }
+
+            await cargarEstadios();
+            document.getElementById('p-estadio-select').value = estadioCreado.nombre;
+            cerrarModalCrearEstadio();
+        }
+
+        // --- COMPETICIONES ---
+        let competicionesMemoria = [];
+        async function cargarCompeticiones() {
+            try {
+                const res = await fetch(`${API_URL}/competiciones/`);
+                competicionesMemoria = await res.json();
+            } catch (e) {
+                competicionesMemoria = [];
+            }
+            // El select del partido guarda solo el nombre (el partido ya tiene
+            // su propia fecha, de ahí sale el año), así que se muestran nombres
+            // únicos aunque haya varias temporadas cargadas con ese nombre.
+            const nombresUnicos = [...new Set(competicionesMemoria.map(c => c.nombre))].sort();
+            const opciones = nombresUnicos.map(n => `<option value="${n}">${n}</option>`).join('');
+            document.getElementById('p-competicion-select').innerHTML = opciones || `<option value="">Sin competiciones registradas</option>`;
+        }
+
+        function abrirModalCrearCompeticion() {
+            document.getElementById('modal-crear-competicion').classList.remove('hidden');
+        }
+
+        function cerrarModalCrearCompeticion() {
+            document.getElementById('modal-crear-competicion').classList.add('hidden');
+            document.getElementById('pop-comp-nombre').value = '';
+            document.getElementById('pop-comp-temporada').value = '';
+        }
+
+        async function guardarCompeticionRapida(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('pop-comp-nombre').value.trim();
+            const temporada = document.getElementById('pop-comp-temporada').value.trim() || null;
+            if (!nombre) return;
+
+            let competicionCreada;
+            try {
+                competicionCreada = await apiRequest(`${API_URL}/competiciones/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, temporada })
+                });
+            } catch (err) { return; }
+
+            await cargarCompeticiones();
+            document.getElementById('p-competicion-select').value = competicionCreada.nombre;
+            cerrarModalCrearCompeticion();
+        }
+
+        // --- INSTANCIAS ---
+        let instanciasMemoria = [];
+        async function cargarInstancias() {
+            try {
+                const res = await fetch(`${API_URL}/instancias/`);
+                instanciasMemoria = await res.json();
+            } catch (e) {
+                instanciasMemoria = [];
+            }
+            const opciones = instanciasMemoria.map(i => `<option value="${i.nombre}">${i.nombre}</option>`).join('');
+            document.getElementById('p-instancia-select').innerHTML = opciones || `<option value="">Sin instancias registradas</option>`;
+        }
+
+        function abrirModalCrearInstancia() {
+            document.getElementById('modal-crear-instancia').classList.remove('hidden');
+        }
+
+        function cerrarModalCrearInstancia() {
+            document.getElementById('modal-crear-instancia').classList.add('hidden');
+            document.getElementById('pop-inst-nombre').value = '';
+        }
+
+        async function guardarInstanciaRapida(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('pop-inst-nombre').value.trim();
+            if (!nombre) return;
+
+            let instanciaCreada;
+            try {
+                instanciaCreada = await apiRequest(`${API_URL}/instancias/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre })
+                });
+            } catch (err) { return; }
+
+            await cargarInstancias();
+            document.getElementById('p-instancia-select').value = instanciaCreada.nombre;
+            cerrarModalCrearInstancia();
+        }
+
+        function abrirModalCrearEquipo(target) {
+            campoEquipoTarget = target;
+            document.getElementById('modal-crear-equipo').classList.remove('hidden');
+        }
+
+        function cerrarModalCrearEquipo() {
+            document.getElementById('modal-crear-equipo').classList.add('hidden');
+            document.getElementById('pop-eq-nombre').value = '';
+        }
+
+        async function guardarEquipoRapido(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('pop-eq-nombre').value.trim();
+            if (!nombre) return;
+
+            let equipoCreado;
+            try {
+                equipoCreado = await apiRequest(`${API_URL}/equipos/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre })
+                });
+            } catch (err) { return; }
+
+            await cargarEquipos();
+
+            if (campoEquipoTarget === 'local') {
+                document.getElementById('p-local-select').value = equipoCreado.nombre;
+            } else if (campoEquipoTarget === 'visitante') {
+                document.getElementById('p-visitante-select').value = equipoCreado.nombre;
+            }
+
+            cerrarModalCrearEquipo();
+        }
+
+        // --- PARTIDOS VISTOS ---
+        async function cargarPartidos() {
+            await cargarEquipos();
+            await cargarEstadios();
+            await cargarCompeticiones();
+            await cargarInstancias();
+            const res = await fetch(`${API_URL}/partidos/`);
+            partidosMemoria = await res.json();
+            poblarFiltrosPartidos();
+            aplicarFiltrosPartidos();
+        }
+
+        function renderPartidos(partidos) {
+            const contenedor = document.getElementById('lista-partidos');
+            contenedor.innerHTML = '';
+
+            if (partidos.length === 0) {
+                contenedor.innerHTML = `<p class="text-slate-500 text-sm py-4 col-span-full">No hay partidos registrados que coincidan con la búsqueda.</p>`;
+                return;
+            }
+
+            partidos.forEach(p => {
+                let golesLocal = 0;
+                let golesVisitante = 0;
+
+                const golesOrdenados = [...p.goles];
+
+                let golesHTML = golesOrdenados.map(g => {
+                    if (g.equipo.toLowerCase() === p.equipo_local.toLowerCase()) golesLocal++;
+                    if (g.equipo.toLowerCase() === p.equipo_visitante.toLowerCase()) golesVisitante++;
+
+                    return `
+                        <div class="flex items-center justify-between bg-slate-900 px-2.5 py-1 rounded text-[11px]">
+                            <div class="truncate pr-2">
+                                <span class="font-bold text-emerald-400">${g.minuto}'</span>
+                                <span class="text-white font-medium">${g.jugador.nombre}</span>
+                                <span class="text-slate-500">${g.tipo !== 'JUGADA' ? '· ' + g.tipo : ''}</span>
+                            </div>
+                            <button onclick="borrarGol(${g.id})" title="Borrar gol" class="text-slate-600 hover:text-red-400 transition-colors shrink-0">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+                let colorLocal, colorVisitante;
+                if (golesLocal === golesVisitante) {
+                    colorLocal = colorVisitante = 'bg-amber-400';
+                } else if (golesLocal > golesVisitante) {
+                    colorLocal = 'bg-emerald-400';
+                    colorVisitante = 'bg-red-400';
+                } else {
+                    colorLocal = 'bg-red-400';
+                    colorVisitante = 'bg-emerald-400';
+                }
+
+                contenedor.innerHTML += `
+                    <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg flex flex-col">
+                        <div class="flex justify-between items-start gap-2 mb-3">
+                            <div class="min-w-0">
+                                <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}</span>
+                                <p class="text-[11px] text-slate-400 mt-1 truncate">${p.instancia} • ${p.fecha_partido}</p>
+                            </div>
+                            <div class="flex items-center gap-2.5 shrink-0">
+                                <button onclick='abrirModalEditarPartido(${JSON.stringify(p)})' title="Editar partido" class="text-slate-500 hover:text-emerald-400 transition-colors">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </button>
+                                <button onclick="borrarPartido(${p.id})" title="Borrar partido" class="text-slate-500 hover:text-red-400 transition-colors">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between bg-slate-900/60 p-3 rounded-lg border border-slate-700/50 mb-1">
+                            <p class="text-sm font-bold text-white text-right w-2/5 leading-tight flex items-center justify-end gap-1.5">
+                                <span>${p.equipo_local}</span>
+                                <span class="w-2 h-2 rounded-full ${colorLocal} shrink-0" title="${golesLocal === golesVisitante ? 'Empate' : (golesLocal > golesVisitante ? 'Ganó' : 'Perdió')}"></span>
+                            </p>
+                            <span class="text-xl font-black bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg border border-slate-700 shrink-0">
+                                ${golesLocal}-${golesVisitante}
+                            </span>
+                            <p class="text-sm font-bold text-white text-left w-2/5 leading-tight flex items-center justify-start gap-1.5">
+                                <span class="w-2 h-2 rounded-full ${colorVisitante} shrink-0" title="${golesLocal === golesVisitante ? 'Empate' : (golesVisitante > golesLocal ? 'Ganó' : 'Perdió')}"></span>
+                                <span>${p.equipo_visitante}</span>
+                            </p>
+                        </div>
+
+                        ${p.estadio ? `<p class="text-[11px] text-slate-500 text-center mb-3"><i class="fa-solid fa-location-dot mr-1"></i>${p.estadio}</p>` : '<div class="mb-3"></div>'}
+
+                        <div class="space-y-1 flex-1 max-h-32 overflow-y-auto pr-0.5">
+                            ${golesHTML || '<p class="text-[11px] text-slate-500 italic">Sin goles registrados.</p>'}
+                        </div>
+
+                        <button onclick="abrirModalGol(${p.id})" class="w-full mt-3 text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-plus mr-1.5 text-emerald-400"></i> Sumar Gol
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        async function borrarPartido(id) {
+            if (!confirmarBorrado('¿Borrar este partido y todos sus goles registrados? Esta acción no se puede deshacer.')) return;
+            try {
+                await apiRequest(`${API_URL}/partidos/${id}`, { method: 'DELETE' });
+                cargarPartidos();
+            } catch (err) { /* el mensaje ya se mostró en apiRequest */ }
+        }
+
+        async function borrarGol(id) {
+            if (!confirmarBorrado('¿Borrar este gol?')) return;
+            try {
+                await apiRequest(`${API_URL}/goles/${id}`, { method: 'DELETE' });
+                cargarPartidos();
+            } catch (err) { /* el mensaje ya se mostró en apiRequest */ }
+        }
+
+        // Puebla las 3 listas desplegables de filtros con los valores
+        // realmente presentes en los partidos cargados.
+        function poblarFiltrosPartidos() {
+            const selComp = document.getElementById('filtro-competicion');
+            const selAnio = document.getElementById('filtro-anio');
+            const selEquipo = document.getElementById('filtro-equipo');
+
+            const valorComp = selComp.value;
+            const valorAnio = selAnio.value;
+            const valorEquipo = selEquipo.value;
+
+            const competiciones = [...new Set(partidosMemoria.map(p => p.competicion))].sort();
+            const anios = [...new Set(partidosMemoria.map(p => p.fecha_partido.slice(0, 4)))].sort().reverse();
+            const equipos = [...new Set(partidosMemoria.flatMap(p => [p.equipo_local, p.equipo_visitante]))].sort();
+
+            selComp.innerHTML = `<option value="">Todas las competiciones</option>` +
+                competiciones.map(c => `<option value="${c}">${c}</option>`).join('');
+            selAnio.innerHTML = `<option value="">Todos los años</option>` +
+                anios.map(a => `<option value="${a}">${a}</option>`).join('');
+            selEquipo.innerHTML = `<option value="">Todos los equipos</option>` +
+                equipos.map(e => `<option value="${e}">${e}</option>`).join('');
+
+            if (competiciones.includes(valorComp)) selComp.value = valorComp;
+            if (anios.includes(valorAnio)) selAnio.value = valorAnio;
+            if (equipos.includes(valorEquipo)) selEquipo.value = valorEquipo;
+        }
+
+        // Combina el texto libre + los 3 selects de filtro y renderiza el resultado.
+        function aplicarFiltrosPartidos() {
+            const q = document.getElementById('filtro-partidos').value.toLowerCase();
+            const competicion = document.getElementById('filtro-competicion').value;
+            const anio = document.getElementById('filtro-anio').value;
+            const equipo = document.getElementById('filtro-equipo').value;
+
+            const filtrados = partidosMemoria.filter(p => {
+                const coincideTexto = !q ||
+                    p.equipo_local.toLowerCase().includes(q) ||
+                    p.equipo_visitante.toLowerCase().includes(q) ||
+                    p.competicion.toLowerCase().includes(q);
+                const coincideCompeticion = !competicion || p.competicion === competicion;
+                const coincideAnio = !anio || p.fecha_partido.slice(0, 4) === anio;
+                const coincideEquipo = !equipo || p.equipo_local === equipo || p.equipo_visitante === equipo;
+                return coincideTexto && coincideCompeticion && coincideAnio && coincideEquipo;
+            });
+            renderPartidos(filtrados);
+        }
+
+        function limpiarFiltrosPartidos() {
+            document.getElementById('filtro-partidos').value = '';
+            document.getElementById('filtro-competicion').value = '';
+            document.getElementById('filtro-anio').value = '';
+            document.getElementById('filtro-equipo').value = '';
+            aplicarFiltrosPartidos();
+        }
+
+        // --- POPUP NUEVO PARTIDO ---
+        function abrirModalNuevoPartido() {
+            document.getElementById('p-edit-id').value = '';
+            document.getElementById('modal-partido-titulo').innerHTML = '<i class="fa-solid fa-plus-circle text-emerald-400 mr-2"></i>Registrar Partido Visto';
+            document.getElementById('p-submit-btn').textContent = 'Guardar Partido';
+            document.getElementById('modal-partido').classList.remove('hidden');
+        }
+
+        function abrirModalEditarPartido(partido) {
+            document.getElementById('p-edit-id').value = partido.id;
+            document.getElementById('p-competicion-select').value = partido.competicion;
+            document.getElementById('p-local-select').value = partido.equipo_local;
+            document.getElementById('p-visitante-select').value = partido.equipo_visitante;
+            document.getElementById('p-estadio-select').value = partido.estadio || '';
+            document.getElementById('p-instancia-select').value = partido.instancia;
+            document.getElementById('p-fecha').value = partido.fecha_partido;
+            document.getElementById('modal-partido-titulo').innerHTML = '<i class="fa-solid fa-pen text-emerald-400 mr-2"></i>Editar Partido';
+            document.getElementById('p-submit-btn').textContent = 'Guardar Cambios';
+            document.getElementById('modal-partido').classList.remove('hidden');
+        }
+
+        function cerrarModalNuevoPartido() {
+            document.getElementById('modal-partido').classList.add('hidden');
+        }
+
+        async function guardarNuevoPartido(e) {
+            e.preventDefault();
+            const local = document.getElementById('p-local-select').value;
+            const visitante = document.getElementById('p-visitante-select').value;
+
+            if (local === visitante) {
+                alert("Un equipo no puede jugar contra sí mismo.");
+                return;
+            }
+
+            const data = {
+                competicion: document.getElementById('p-competicion-select').value,
+                equipo_local: local,
+                equipo_visitante: visitante,
+                estadio: document.getElementById('p-estadio-select').value || null,
+                instancia: document.getElementById('p-instancia-select').value,
+                fecha_partido: document.getElementById('p-fecha').value
+            };
+
+            const idEdicion = document.getElementById('p-edit-id').value;
+
+            try {
+                if (idEdicion) {
+                    await apiRequest(`${API_URL}/partidos/${idEdicion}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    await apiRequest(`${API_URL}/partidos/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
+            } catch (err) { return; }
+
+            cerrarModalNuevoPartido();
+            cargarPartidos();
+        }
+
+        // --- JUGADORES ---
+        let listaJugadoresMemoria = [];
+        async function cargarJugadores() {
+            await cargarEquipos();
+            const res = await fetch(`${API_URL}/jugadores/`);
+            listaJugadoresMemoria = await res.json();
+            poblarFiltroJugadoresEquipo();
+            aplicarFiltrosJugadores();
+        }
+
+        function poblarFiltroJugadoresEquipo() {
+            const sel = document.getElementById('filtro-jugadores-equipo');
+            const valorActual = sel.value;
+            // "equipos" es la lista de clubes por los que anotó, calculada
+            // en el backend a partir de sus goles (ver GET /jugadores/).
+            const equipos = [...new Set(listaJugadoresMemoria.flatMap(j => j.equipos || []))].sort();
+            sel.innerHTML = `<option value="">Todos los clubes</option>` +
+                equipos.map(e => `<option value="${e}">${e}</option>`).join('');
+            if (equipos.includes(valorActual)) sel.value = valorActual;
+        }
+
+        function renderTablaJugadores(jugadores) {
+            const tbody = document.getElementById('tbody-jugadores');
+            tbody.innerHTML = '';
+
+            if (jugadores.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500 text-sm">No hay jugadores que coincidan con el filtro.</td></tr>`;
+                return;
+            }
+
+            jugadores.forEach(j => {
+                const clubesHTML = (j.equipos && j.equipos.length > 0)
+                    ? j.equipos.map(e => `<span class="inline-block bg-slate-900 border border-slate-700 text-emerald-400 text-[11px] px-2 py-0.5 rounded-full mr-1 mb-1">${e}</span>`).join('')
+                    : `<span class="text-slate-500 text-xs italic">Sin goles registrados</span>`;
+
+                tbody.innerHTML += `
+                    <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+                        <td class="px-4 py-3 font-mono text-slate-500">#${j.id}</td>
+                        <td class="px-4 py-3 font-semibold text-white">${j.nombre}</td>
+                        <td class="px-4 py-3">${j.nacionalidad || '-'}</td>
+                        <td class="px-4 py-3">${j.posicion || '-'}</td>
+                        <td class="px-4 py-3">${j.edad ? j.edad + ' años' : '-'}</td>
+                        <td class="px-4 py-3">${clubesHTML}</td>
+                        <td class="px-4 py-3 text-right space-x-3">
+                            <button onclick='abrirModalEditarJugador(${JSON.stringify(j)})' title="Editar jugador" class="text-slate-500 hover:text-emerald-400 transition-colors">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="borrarJugador(${j.id})" title="Borrar jugador" class="text-slate-500 hover:text-red-400 transition-colors">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function borrarJugador(id) {
+            if (!confirmarBorrado('¿Borrar este jugador? También se borrarán todos sus goles registrados.')) return;
+            try {
+                await apiRequest(`${API_URL}/jugadores/${id}`, { method: 'DELETE' });
+                cargarJugadores();
+            } catch (err) { /* el mensaje ya se mostró en apiRequest */ }
+        }
+
+        function aplicarFiltrosJugadores() {
+            const q = document.getElementById('buscar-tabla-jugadores').value.toLowerCase();
+            const equipo = document.getElementById('filtro-jugadores-equipo').value;
+            const filtrados = listaJugadoresMemoria.filter(j => {
+                const coincideTexto = !q || j.nombre.toLowerCase().includes(q);
+                const coincideEquipo = !equipo || (j.equipos && j.equipos.includes(equipo));
+                return coincideTexto && coincideEquipo;
+            });
+            renderTablaJugadores(filtrados);
+        }
+
+        async function guardarJugador(e) {
+            e.preventDefault();
+            const data = {
+                nombre: document.getElementById('j-nombre').value,
+                nacionalidad: document.getElementById('j-nacionalidad').value || null,
+                posicion: document.getElementById('j-posicion').value || null,
+                edad: document.getElementById('j-edad').value ? parseInt(document.getElementById('j-edad').value) : null
+            };
+
+            try {
+                await apiRequest(`${API_URL}/jugadores/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            } catch (err) { return; }
+
+            document.getElementById('form-jugador').reset();
+            cargarJugadores();
+        }
+
+        // --- POPUP GOL Y AUTOCOMPLETAR JUGADORES ---
+        function abrirModalGol(partidoId) {
+            document.getElementById('modal-partido-id').value = partidoId;
+            const partido = partidosMemoria.find(p => p.id === partidoId);
+            const selectEquipo = document.getElementById('gol-equipo-select');
+            selectEquipo.innerHTML = `
+                <option value="${partido.equipo_local}">${partido.equipo_local} (Local)</option>
+                <option value="${partido.equipo_visitante}">${partido.equipo_visitante} (Visitante)</option>
+            `;
+            document.getElementById('modal-gol').classList.remove('hidden');
+        }
+
+        function cerrarModalGol() {
+            document.getElementById('modal-gol').classList.add('hidden');
+            document.getElementById('gol-buscar-jugador').value = '';
+            document.getElementById('gol-jugador-id').value = '';
+            document.getElementById('jugador-seleccionado-info').classList.add('hidden');
+        }
+
+        async function buscarJugadorAuto(query) {
+            const desp = document.getElementById('desplegable-jugadores');
+            if (query.trim().length < 2) {
+                desp.classList.add('hidden');
+                return;
+            }
+
+            const res = await fetch(`${API_URL}/jugadores/buscar/?nombre=${encodeURIComponent(query)}`);
+            const resultados = await res.json();
+            desp.innerHTML = '';
+
+            if (resultados.length === 0) {
+                desp.innerHTML = `
+                    <div class="p-3 text-xs text-slate-400 text-center">
+                        No existe este jugador. <br>
+                        <button onclick="abrirModalCrearJugadorRapido('${query}')" class="mt-2 text-emerald-400 underline font-bold">＋ Crear "${query}" ahora</button>
+                    </div>
+                `;
+            } else {
+                resultados.forEach(j => {
+                    const clubes = (j.equipos && j.equipos.length > 0) ? j.equipos.join(', ') : 'Sin goles aún';
+                    desp.innerHTML += `
+                        <div onclick="seleccionarJugadorGol(${j.id}, '${j.nombre}')" class="p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs">
+                            <p class="font-bold text-white">${j.nombre}</p>
+                            <p class="text-slate-400">${clubes} • ${j.nacionalidad || 'N/A'}</p>
+                        </div>
+                    `;
+                });
+            }
+            desp.classList.remove('hidden');
+        }
+
+        function seleccionarJugadorGol(id, nombre) {
+            document.getElementById('gol-jugador-id').value = id;
+            document.getElementById('nombre-jugador-sel').innerText = nombre;
+            document.getElementById('jugador-seleccionado-info').classList.remove('hidden');
+            document.getElementById('gol-buscar-jugador').value = nombre;
+            document.getElementById('desplegable-jugadores').classList.add('hidden');
+        }
+
+        // --- POPUP CREAR JUGADOR RÁPIDO ---
+        function abrirModalCrearJugadorRapido(nombreSugerido) {
+            document.getElementById('desplegable-jugadores').classList.add('hidden');
+            document.getElementById('pop-j-nombre').value = nombreSugerido;
+            document.getElementById('modal-crear-jugador-rapido').classList.remove('hidden');
+        }
+
+        function cerrarModalCrearJugadorRapido() {
+            document.getElementById('modal-crear-jugador-rapido').classList.add('hidden');
+        }
+
+        async function guardarJugadorRapido(e) {
+            e.preventDefault();
+            const data = {
+                nombre: document.getElementById('pop-j-nombre').value,
+                edad: document.getElementById('pop-j-edad').value ? parseInt(document.getElementById('pop-j-edad').value) : null,
+                nacionalidad: document.getElementById('pop-j-nacionalidad').value || null,
+                posicion: document.getElementById('pop-j-posicion').value || null
+            };
+
+            let nuevoJugador;
+            try {
+                nuevoJugador = await apiRequest(`${API_URL}/jugadores/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            } catch (err) { return; }
+
+            seleccionarJugadorGol(nuevoJugador.id, nuevoJugador.nombre);
+            cerrarModalCrearJugadorRapido();
+        }
+
+        // --- EDITAR JUGADOR ---
+        function abrirModalEditarJugador(jugador) {
+            document.getElementById('edit-j-id').value = jugador.id;
+            document.getElementById('edit-j-nombre').value = jugador.nombre;
+            document.getElementById('edit-j-edad').value = jugador.edad || '';
+            document.getElementById('edit-j-nacionalidad').value = jugador.nacionalidad || '';
+            document.getElementById('edit-j-posicion').value = jugador.posicion || '';
+            document.getElementById('modal-editar-jugador').classList.remove('hidden');
+        }
+
+        function cerrarModalEditarJugador() {
+            document.getElementById('modal-editar-jugador').classList.add('hidden');
+        }
+
+        async function guardarJugadorEditado(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-j-id').value;
+            const data = {
+                nombre: document.getElementById('edit-j-nombre').value,
+                edad: document.getElementById('edit-j-edad').value ? parseInt(document.getElementById('edit-j-edad').value) : null,
+                nacionalidad: document.getElementById('edit-j-nacionalidad').value || null,
+                posicion: document.getElementById('edit-j-posicion').value || null
+            };
+
+            try {
+                await apiRequest(`${API_URL}/jugadores/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            } catch (err) { return; }
+
+            cerrarModalEditarJugador();
+            cargarJugadores();
+        }
+
+        async function guardarGol() {
+            const jugadorId = document.getElementById('gol-jugador-id').value;
+            if (!jugadorId) {
+                alert("Por favor buscá y seleccioná un jugador de la lista.");
+                return;
+            }
+
+            const data = {
+                partido_id: parseInt(document.getElementById('modal-partido-id').value),
+                jugador_id: parseInt(jugadorId),
+                equipo: document.getElementById('gol-equipo-select').value,
+                minuto: document.getElementById('gol-minuto').value,
+                tipo: document.getElementById('gol-tipo').value
+            };
+
+            try {
+                await apiRequest(`${API_URL}/goles/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            } catch (err) { return; }
+
+            cerrarModalGol();
+            cargarPartidos();
+        }
+
+        // --- ESTADÍSTICAS ---
+        let filtrosEstadisticasCargados = false;
+        async function poblarFiltrosEstadisticas() {
+            if (filtrosEstadisticasCargados) return;
+            try {
+                const [resComp, resPart] = await Promise.all([
+                    fetch(`${API_URL}/competiciones/`),
+                    fetch(`${API_URL}/partidos/`)
+                ]);
+                const competiciones = await resComp.json();
+                const partidos = await resPart.json();
+                const nombresUnicos = [...new Set(competiciones.map(c => c.nombre))].sort();
+                const anios = [...new Set(partidos.map(p => p.fecha_partido.slice(0, 4)))].sort().reverse();
+
+                document.getElementById('stats-filtro-competicion').innerHTML =
+                    `<option value="">Todas las competiciones</option>` +
+                    nombresUnicos.map(n => `<option value="${n}">${n}</option>`).join('');
+                document.getElementById('stats-filtro-anio').innerHTML =
+                    `<option value="">Todos los años</option>` +
+                    anios.map(a => `<option value="${a}">${a}</option>`).join('');
+
+                filtrosEstadisticasCargados = true;
+            } catch (e) { /* si falla, quedan los selects con "Todos" nomás */ }
+        }
+
+        function limpiarFiltrosEstadisticas() {
+            document.getElementById('stats-filtro-competicion').value = '';
+            document.getElementById('stats-filtro-anio').value = '';
+            cargarEstadisticas();
+        }
+
+        async function cargarEstadisticas() {
+            await poblarFiltrosEstadisticas();
+
+            const competicion = document.getElementById('stats-filtro-competicion').value;
+            const anio = document.getElementById('stats-filtro-anio').value;
+            const params = new URLSearchParams();
+            if (competicion) params.set('competicion', competicion);
+            if (anio) params.set('anio', anio);
+            const qs = params.toString() ? `?${params.toString()}` : '';
+
+            // --- KPIs + Local vs Visitante ---
+            const resResumen = await fetch(`${API_URL}/estadisticas/resumen${qs}`);
+            const resumen = await resResumen.json();
+            document.getElementById('kpi-total-partidos').textContent = resumen.total_partidos;
+            document.getElementById('kpi-total-goles').textContent = resumen.total_goles;
+            document.getElementById('kpi-promedio-goles').textContent = resumen.promedio_goles_partido;
+
+            const totalResultados = resumen.gana_local + resumen.gana_visitante + resumen.empates;
+            const contRes = document.getElementById('resultado-local-visitante');
+            if (totalResultados === 0) {
+                contRes.innerHTML = '<p class="text-xs text-slate-500">Sin datos acumulados.</p>';
+            } else {
+                const pctLocal = Math.round((resumen.gana_local / totalResultados) * 100);
+                const pctVisitante = Math.round((resumen.gana_visitante / totalResultados) * 100);
+                const pctEmpate = 100 - pctLocal - pctVisitante;
+                contRes.innerHTML = `
+                    <div class="flex h-3 rounded-full overflow-hidden bg-slate-900 mb-3">
+                        <div style="width:${pctLocal}%" class="bg-emerald-400" title="Gana el local"></div>
+                        <div style="width:${pctEmpate}%" class="bg-amber-400" title="Empate"></div>
+                        <div style="width:${pctVisitante}%" class="bg-red-400" title="Gana el visitante"></div>
+                    </div>
+                    <div class="flex flex-wrap justify-between gap-y-1 text-[11px] text-slate-300">
+                        <span><span class="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>Local ${resumen.gana_local} (${pctLocal}%)</span>
+                        <span><span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1"></span>Empate ${resumen.empates} (${pctEmpate}%)</span>
+                        <span><span class="inline-block w-2 h-2 rounded-full bg-red-400 mr-1"></span>Visitante ${resumen.gana_visitante} (${pctVisitante}%)</span>
+                    </div>
+                `;
+            }
+
+            // --- Top Goleadores ---
+            // Acá sí van TODOS los que tengan al menos un gol (la tarjeta
+            // ya tiene scroll interno), a diferencia del resto de las
+            // tarjetas de esta pestaña, que se quedan en el top 3.
+            const paramsGoleadores = new URLSearchParams(params);
+            paramsGoleadores.set('limit', '1000');
+            const resG = await fetch(`${API_URL}/estadisticas/top-goleadores?${paramsGoleadores.toString()}`);
+            const topGoleadores = await resG.json();
+            const contG = document.getElementById('top-goleadores-list');
+            contG.innerHTML = topGoleadores.length ? '' : '<p class="text-xs text-slate-500">Sin datos acumulados.</p>';
+
+            topGoleadores.forEach((g, i) => {
+                contG.innerHTML += `
+                    <div class="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-bold text-amber-400 text-sm">#${i+1}</span>
+                            <div>
+                                <p class="font-semibold text-sm text-white">${g.nombre}</p>
+                                <p class="text-xs text-slate-400">${g.nacionalidad || 'N/A'}</p>
+                            </div>
+                        </div>
+                        <span class="bg-emerald-950 border border-emerald-800 text-emerald-400 font-bold px-3 py-1 rounded-full text-xs whitespace-nowrap">
+                            ${g.total_goles} ${g.total_goles === 1 ? 'gol' : 'goles'}
+                        </span>
+                    </div>
+                `;
+            });
+
+            // --- Top Equipos ---
+            const resE = await fetch(`${API_URL}/estadisticas/top-equipos-goles${qs}`);
+            const topEquipos = await resE.json();
+            const contE = document.getElementById('top-equipos-list');
+            contE.innerHTML = topEquipos.length ? '' : '<p class="text-xs text-slate-500">Sin datos acumulados.</p>';
+
+            topEquipos.forEach((e, i) => {
+                contE.innerHTML += `
+                    <div class="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-bold text-emerald-400 text-sm">#${i+1}</span>
+                            <p class="font-semibold text-sm text-white">${e.equipo}</p>
+                        </div>
+                        <span class="bg-slate-800 text-slate-200 font-bold px-3 py-1 rounded-full text-xs whitespace-nowrap">
+                            ${e.total_goles} ${e.total_goles === 1 ? 'gol' : 'goles'}
+                        </span>
+                    </div>
+                `;
+            });
+
+            // --- Top Estadios ---
+            const resEst = await fetch(`${API_URL}/estadisticas/top-estadios${qs}`);
+            const topEstadios = await resEst.json();
+            const contEst = document.getElementById('top-estadios-list');
+            contEst.innerHTML = topEstadios.length ? '' : '<p class="text-xs text-slate-500">Sin estadios cargados en los partidos.</p>';
+
+            topEstadios.forEach((e, i) => {
+                contEst.innerHTML += `
+                    <div class="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-bold text-sky-400 text-sm">#${i+1}</span>
+                            <p class="font-semibold text-sm text-white">${e.estadio}</p>
+                        </div>
+                        <span class="bg-slate-800 text-slate-200 font-bold px-3 py-1 rounded-full text-xs whitespace-nowrap">
+                            ${e.total_partidos} ${e.total_partidos === 1 ? 'partido' : 'partidos'}
+                        </span>
+                    </div>
+                `;
+            });
+
+            // --- Goles por Tipo ---
+            const resTipo = await fetch(`${API_URL}/estadisticas/goles-por-tipo${qs}`);
+            const golesPorTipo = await resTipo.json();
+            const contTipo = document.getElementById('goles-por-tipo-list');
+            contTipo.innerHTML = golesPorTipo.length ? '' : '<p class="text-xs text-slate-500">Sin datos acumulados.</p>';
+
+            const maxTipo = golesPorTipo.length ? Math.max(...golesPorTipo.map(t => t.total_goles)) : 0;
+            golesPorTipo.forEach(t => {
+                const pct = maxTipo ? Math.round((t.total_goles / maxTipo) * 100) : 0;
+                contTipo.innerHTML += `
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-white font-medium">${t.tipo}</span>
+                            <span class="text-slate-400">${t.total_goles} ${t.total_goles === 1 ? 'gol' : 'goles'}</span>
+                        </div>
+                        <div class="h-2 bg-slate-900 rounded-full overflow-hidden">
+                            <div style="width:${pct}%" class="h-full bg-rose-400"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // --- Equipos Más Ganadores ---
+            const resVict = await fetch(`${API_URL}/estadisticas/top-equipos-victorias${qs}`);
+            const topVictorias = await resVict.json();
+            const contVict = document.getElementById('top-victorias-list');
+            contVict.innerHTML = topVictorias.length ? '' : '<p class="text-xs text-slate-500">Sin partidos con un ganador definido.</p>';
+
+            topVictorias.forEach((v, i) => {
+                contVict.innerHTML += `
+                    <div class="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-bold text-yellow-400 text-sm">#${i+1}</span>
+                            <p class="font-semibold text-sm text-white">${v.equipo}</p>
+                        </div>
+                        <span class="bg-slate-800 text-slate-200 font-bold px-3 py-1 rounded-full text-xs whitespace-nowrap">
+                            ${v.victorias} ${v.victorias === 1 ? 'victoria' : 'victorias'}
+                        </span>
+                    </div>
+                `;
+            });
+        }
+
+        // --- INICIO / DASHBOARD ---
+        async function cargarDashboard() {
+            let resumen;
+            try {
+                const res = await fetch(`${API_URL}/dashboard/resumen`);
+                resumen = await res.json();
+            } catch (e) {
+                return;
+            }
+
+            document.getElementById('home-kpi-partidos').textContent = resumen.total_partidos;
+            document.getElementById('home-kpi-goles').textContent = resumen.total_goles;
+            document.getElementById('home-kpi-competiciones').textContent = resumen.total_competiciones;
+            document.getElementById('home-kpi-equipos').textContent = resumen.total_equipos;
+
+            // Último partido
+            const contUltimo = document.getElementById('home-ultimo-partido');
+            const p = resumen.ultimo_partido;
+            if (!p) {
+                contUltimo.innerHTML = '<p class="text-xs text-slate-500">Todavía no registraste ningún partido.</p>';
+            } else {
+                let golesLocal = 0, golesVisitante = 0;
+                p.goles.forEach(g => {
+                    if (g.equipo.toLowerCase() === p.equipo_local.toLowerCase()) golesLocal++;
+                    if (g.equipo.toLowerCase() === p.equipo_visitante.toLowerCase()) golesVisitante++;
+                });
+                let colorLocal, colorVisitante;
+                if (golesLocal === golesVisitante) {
+                    colorLocal = colorVisitante = 'bg-amber-400';
+                } else if (golesLocal > golesVisitante) {
+                    colorLocal = 'bg-emerald-400'; colorVisitante = 'bg-red-400';
+                } else {
+                    colorLocal = 'bg-red-400'; colorVisitante = 'bg-emerald-400';
+                }
+
+                contUltimo.innerHTML = `
+                    <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}</span>
+                    <p class="text-[11px] text-slate-400 mt-1 mb-3">${p.instancia} • ${p.fecha_partido}</p>
+                    <div class="flex items-center justify-between bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+                        <p class="text-sm font-bold text-white text-right w-2/5 leading-tight flex items-center justify-end gap-1.5">
+                            <span>${p.equipo_local}</span>
+                            <span class="w-2 h-2 rounded-full ${colorLocal} shrink-0"></span>
+                        </p>
+                        <span class="text-xl font-black bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg border border-slate-700 shrink-0">
+                            ${golesLocal}-${golesVisitante}
+                        </span>
+                        <p class="text-sm font-bold text-white text-left w-2/5 leading-tight flex items-center justify-start gap-1.5">
+                            <span class="w-2 h-2 rounded-full ${colorVisitante} shrink-0"></span>
+                            <span>${p.equipo_visitante}</span>
+                        </p>
+                    </div>
+                    ${p.estadio ? `<p class="text-[11px] text-slate-500 text-center mt-2"><i class="fa-solid fa-location-dot mr-1"></i>${p.estadio}</p>` : ''}
+                `;
+            }
+
+            // Top 3 goleadores
+            const contGoleador = document.getElementById('home-top-goleador');
+            const topG = resumen.top_goleadores || [];
+            if (topG.length === 0) {
+                contGoleador.innerHTML = '<p class="text-xs text-slate-500">Todavía no hay goles registrados.</p>';
+            } else {
+                contGoleador.innerHTML = topG.map((g, i) => `
+                    <div class="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-700/50 ${i > 0 ? 'mt-2' : ''}">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-bold text-amber-400 text-sm">#${i+1}</span>
+                            <p class="font-semibold text-sm text-white">${g.nombre}</p>
+                        </div>
+                        <span class="bg-emerald-950 border border-emerald-800 text-emerald-400 font-bold px-3 py-1 rounded-full text-xs whitespace-nowrap">
+                            ${g.goles} ${g.goles === 1 ? 'gol' : 'goles'}
+                        </span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Carga inicial
+        cargarDashboard();
+    </script>
+</body>
+</html>

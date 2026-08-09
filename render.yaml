@@ -1,0 +1,25 @@
+# ============================================================
+# Blueprint de Render. Con este archivo en la raíz del repo,
+# desde el dashboard de Render elegís "New +" -> "Blueprint",
+# apuntás a tu repo de GitHub, y Render arma solo:
+#   - el servicio web (tu FastAPI)
+#   - la base de datos Postgres
+#   - la conexión entre ambos (DATABASE_URL)
+# sin que tengas que configurar nada a mano.
+# ============================================================
+services:
+  - type: web
+    name: futbol-tracker
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: futbol-tracker-db
+          property: connectionString
+
+databases:
+  - name: futbol-tracker-db
+    plan: free
