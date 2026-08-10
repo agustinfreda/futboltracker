@@ -314,7 +314,7 @@
                             <label class="block text-xs font-medium text-slate-400">Equipo Local</label>
                             <button type="button" onclick="abrirModalCrearEquipo('local')" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
                         </div>
-                        <select id="p-local-select" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <select id="p-local-select" required onchange="togglePenalesGanador()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                             <!-- Carga dinámica -->
                         </select>
                     </div>
@@ -323,7 +323,7 @@
                             <label class="block text-xs font-medium text-slate-400">Equipo Visitante</label>
                             <button type="button" onclick="abrirModalCrearEquipo('visitante')" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
                         </div>
-                        <select id="p-visitante-select" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <select id="p-visitante-select" required onchange="togglePenalesGanador()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                             <!-- Carga dinámica -->
                         </select>
                     </div>
@@ -353,6 +353,19 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Fecha del Partido</label>
                         <input type="date" id="p-fecha" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/60 border border-slate-700/50 rounded-lg p-3">
+                    <label class="flex items-center gap-2 text-xs font-medium text-slate-300">
+                        <input type="checkbox" id="p-penales-check" onchange="togglePenalesGanador()" class="rounded bg-slate-900 border-slate-600 text-emerald-500 focus:ring-emerald-500">
+                        Se definió por penales (quedó empatado en el resultado final)
+                    </label>
+                    <div id="p-penales-ganador-wrap" class="mt-2 hidden">
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Ganó en penales</label>
+                        <select id="p-penales-ganador-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <option value="">Seleccioná el equipo local o visitante</option>
+                        </select>
                     </div>
                 </div>
 
@@ -873,8 +886,14 @@
                     `;
                 }).join('');
 
-                let colorLocal, colorVisitante;
-                if (golesLocal === golesVisitante) {
+                let colorLocal, colorVisitante, penalesHTML = '';
+                const huboPenales = golesLocal === golesVisitante && p.penales && p.penales_ganador;
+                if (huboPenales) {
+                    const ganoLocal = p.penales_ganador.toLowerCase() === p.equipo_local.toLowerCase();
+                    colorLocal = ganoLocal ? 'bg-emerald-400' : 'bg-red-400';
+                    colorVisitante = ganoLocal ? 'bg-red-400' : 'bg-emerald-400';
+                    penalesHTML = `<p class="text-[11px] text-amber-400 text-center -mt-0.5 mb-3"><i class="fa-solid fa-futbol mr-1"></i>${p.penales_ganador} ganó por penales</p>`;
+                } else if (golesLocal === golesVisitante) {
                     colorLocal = colorVisitante = 'bg-amber-400';
                 } else if (golesLocal > golesVisitante) {
                     colorLocal = 'bg-emerald-400';
@@ -904,17 +923,18 @@
                         <div class="flex items-center justify-between bg-slate-900/60 p-3 rounded-lg border border-slate-700/50 mb-1">
                             <p class="text-sm font-bold text-white text-right w-2/5 leading-tight flex items-center justify-end gap-1.5">
                                 <span>${p.equipo_local}</span>
-                                <span class="w-2 h-2 rounded-full ${colorLocal} shrink-0" title="${golesLocal === golesVisitante ? 'Empate' : (golesLocal > golesVisitante ? 'Ganó' : 'Perdió')}"></span>
+                                <span class="w-2 h-2 rounded-full ${colorLocal} shrink-0" title="${huboPenales ? (colorLocal === 'bg-emerald-400' ? 'Ganó por penales' : 'Perdió por penales') : (golesLocal === golesVisitante ? 'Empate' : (golesLocal > golesVisitante ? 'Ganó' : 'Perdió'))}"></span>
                             </p>
                             <span class="text-xl font-black bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg border border-slate-700 shrink-0">
                                 ${golesLocal}-${golesVisitante}
                             </span>
                             <p class="text-sm font-bold text-white text-left w-2/5 leading-tight flex items-center justify-start gap-1.5">
-                                <span class="w-2 h-2 rounded-full ${colorVisitante} shrink-0" title="${golesLocal === golesVisitante ? 'Empate' : (golesVisitante > golesLocal ? 'Ganó' : 'Perdió')}"></span>
+                                <span class="w-2 h-2 rounded-full ${colorVisitante} shrink-0" title="${huboPenales ? (colorVisitante === 'bg-emerald-400' ? 'Ganó por penales' : 'Perdió por penales') : (golesLocal === golesVisitante ? 'Empate' : (golesVisitante > golesLocal ? 'Ganó' : 'Perdió'))}"></span>
                                 <span>${p.equipo_visitante}</span>
                             </p>
                         </div>
 
+                        ${penalesHTML}
                         ${p.estadio ? `<p class="text-[11px] text-slate-500 text-center mb-3"><i class="fa-solid fa-location-dot mr-1"></i>${p.estadio}</p>` : '<div class="mb-3"></div>'}
 
                         <div class="space-y-1 flex-1 max-h-32 overflow-y-auto pr-0.5">
@@ -1003,6 +1023,8 @@
         // --- POPUP NUEVO PARTIDO ---
         function abrirModalNuevoPartido() {
             document.getElementById('p-edit-id').value = '';
+            document.getElementById('p-penales-check').checked = false;
+            togglePenalesGanador();
             document.getElementById('modal-partido-titulo').innerHTML = '<i class="fa-solid fa-plus-circle text-emerald-400 mr-2"></i>Registrar Partido Visto';
             document.getElementById('p-submit-btn').textContent = 'Guardar Partido';
             document.getElementById('modal-partido').classList.remove('hidden');
@@ -1016,6 +1038,11 @@
             document.getElementById('p-estadio-select').value = partido.estadio || '';
             document.getElementById('p-instancia-select').value = partido.instancia;
             document.getElementById('p-fecha').value = partido.fecha_partido;
+            document.getElementById('p-penales-check').checked = !!partido.penales;
+            togglePenalesGanador();
+            if (partido.penales && partido.penales_ganador) {
+                document.getElementById('p-penales-ganador-select').value = partido.penales_ganador;
+            }
             document.getElementById('modal-partido-titulo').innerHTML = '<i class="fa-solid fa-pen text-emerald-400 mr-2"></i>Editar Partido';
             document.getElementById('p-submit-btn').textContent = 'Guardar Cambios';
             document.getElementById('modal-partido').classList.remove('hidden');
@@ -1023,6 +1050,31 @@
 
         function cerrarModalNuevoPartido() {
             document.getElementById('modal-partido').classList.add('hidden');
+        }
+
+        // Muestra/oculta el selector de "ganador en penales" y lo puebla
+        // con los equipos local/visitante elegidos en ese momento.
+        function togglePenalesGanador() {
+            const marcado = document.getElementById('p-penales-check').checked;
+            const wrap = document.getElementById('p-penales-ganador-wrap');
+            const select = document.getElementById('p-penales-ganador-select');
+
+            if (!marcado) {
+                wrap.classList.add('hidden');
+                select.value = '';
+                return;
+            }
+
+            const local = document.getElementById('p-local-select').value;
+            const visitante = document.getElementById('p-visitante-select').value;
+            const valorPrevio = select.value;
+
+            select.innerHTML = '<option value="">Seleccioná...</option>' +
+                (local ? `<option value="${local}">${local} (Local)</option>` : '') +
+                (visitante ? `<option value="${visitante}">${visitante} (Visitante)</option>` : '');
+
+            if ([local, visitante].includes(valorPrevio)) select.value = valorPrevio;
+            wrap.classList.remove('hidden');
         }
 
         async function guardarNuevoPartido(e) {
@@ -1035,13 +1087,23 @@
                 return;
             }
 
+            const penales = document.getElementById('p-penales-check').checked;
+            const penalesGanador = document.getElementById('p-penales-ganador-select').value;
+
+            if (penales && !penalesGanador) {
+                alert("Indicá qué equipo ganó en penales.");
+                return;
+            }
+
             const data = {
                 competicion: document.getElementById('p-competicion-select').value,
                 equipo_local: local,
                 equipo_visitante: visitante,
                 estadio: document.getElementById('p-estadio-select').value || null,
                 instancia: document.getElementById('p-instancia-select').value,
-                fecha_partido: document.getElementById('p-fecha').value
+                fecha_partido: document.getElementById('p-fecha').value,
+                penales: penales,
+                penales_ganador: penales ? penalesGanador : null
             };
 
             const idEdicion = document.getElementById('p-edit-id').value;
@@ -1524,8 +1586,14 @@
                     if (g.equipo.toLowerCase() === p.equipo_local.toLowerCase()) golesLocal++;
                     if (g.equipo.toLowerCase() === p.equipo_visitante.toLowerCase()) golesVisitante++;
                 });
-                let colorLocal, colorVisitante;
-                if (golesLocal === golesVisitante) {
+                let colorLocal, colorVisitante, penalesHTML = '';
+                const huboPenales = golesLocal === golesVisitante && p.penales && p.penales_ganador;
+                if (huboPenales) {
+                    const ganoLocal = p.penales_ganador.toLowerCase() === p.equipo_local.toLowerCase();
+                    colorLocal = ganoLocal ? 'bg-emerald-400' : 'bg-red-400';
+                    colorVisitante = ganoLocal ? 'bg-red-400' : 'bg-emerald-400';
+                    penalesHTML = `<p class="text-[11px] text-amber-400 text-center mt-2"><i class="fa-solid fa-futbol mr-1"></i>${p.penales_ganador} ganó por penales</p>`;
+                } else if (golesLocal === golesVisitante) {
                     colorLocal = colorVisitante = 'bg-amber-400';
                 } else if (golesLocal > golesVisitante) {
                     colorLocal = 'bg-emerald-400'; colorVisitante = 'bg-red-400';
@@ -1549,6 +1617,7 @@
                             <span>${p.equipo_visitante}</span>
                         </p>
                     </div>
+                    ${penalesHTML}
                     ${p.estadio ? `<p class="text-[11px] text-slate-500 text-center mt-2"><i class="fa-solid fa-location-dot mr-1"></i>${p.estadio}</p>` : ''}
                 `;
             }

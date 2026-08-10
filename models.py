@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -80,6 +80,13 @@ class Partido(Base):
     estadio = Column(String(150), nullable=True)
     instancia = Column(String(100), nullable=False)
     fecha_partido = Column(Date, nullable=False)
+
+    # Para partidos de mata-mata que terminaron empatados (90' o 120')
+    # y se definieron desde los doce pasos. No importa quién metió o
+    # erró cada penal, solo si hubo definición por penales y quién
+    # se quedó con el pase/título.
+    penales = Column(Boolean, nullable=False, default=False)
+    penales_ganador = Column(String(100), nullable=True)
 
     # Al borrar un partido se borran sus goles automáticamente.
     goles = relationship("Gol", back_populates="partido", cascade="all, delete-orphan")

@@ -354,6 +354,29 @@ def borrar_jugador(jugador_id: int, db: Session = Depends(get_db)):
 # ==========================================
 # ENDPOINTS PARTIDOS
 # ==========================================
+def _validar_penales(local: str, visitante: str, penales: bool, penales_ganador: Optional[str]) -> Optional[str]:
+    """Chequea la info de penales y devuelve el nombre normalizado
+    (con el casing real de local/visitante) del ganador, o None si el
+    partido no se definió por penales."""
+    if not penales:
+        return None
+
+    ganador_clean = (penales_ganador or "").strip()
+    if not ganador_clean:
+        raise HTTPException(
+            status_code=400,
+            detail="Si el partido se definió por penales, indicá qué equipo ganó",
+        )
+    if ganador_clean.lower() == local.lower():
+        return local
+    if ganador_clean.lower() == visitante.lower():
+        return visitante
+    raise HTTPException(
+        status_code=400,
+        detail="El ganador de los penales tiene que ser el equipo local o el visitante de ese partido",
+    )
+
+
 @app.get("/partidos/", response_model=List[schemas.PartidoResponse])
 def obtener_partidos(db: Session = Depends(get_db)):
     return db.query(models.Partido).order_by(models.Partido.fecha_partido.desc()).all()
@@ -379,9 +402,12 @@ def crear_partido(partido: schemas.PartidoCreate, db: Session = Depends(get_db))
             detail="Ya registraste este partido (mismo enfrentamiento, fecha e instancia)",
         )
 
+    ganador_penales = _validar_penales(local, visitante, partido.penales, partido.penales_ganador)
+
     datos = partido.model_dump()
     datos["equipo_local"] = local
     datos["equipo_visitante"] = visitante
+    datos["penales_ganador"] = ganador_penales
     nuevo_partido = models.Partido(**datos)
     db.add(nuevo_partido)
     try:
@@ -429,12 +455,16 @@ def actualizar_partido(partido_id: int, datos: schemas.PartidoUpdate, db: Sessio
         elif gol.equipo.strip().lower() == visitante_viejo.strip().lower():
             gol.equipo = visitante
 
+    ganador_penales = _validar_penales(local, visitante, datos.penales, datos.penales_ganador)
+
     partido.competicion = datos.competicion
     partido.equipo_local = local
     partido.equipo_visitante = visitante
     partido.estadio = datos.estadio
     partido.instancia = datos.instancia
     partido.fecha_partido = datos.fecha_partido
+    partido.penales = datos.penales
+    partido.penales_ganador = ganador_penales
 
     try:
         db.commit()
@@ -503,6 +533,25 @@ def borrar_gol(gol_id: int, db: Session = Depends(get_db)):
 # ==========================================
 # ENDPOINTS ESTADÍSTICAS
 # ==========================================
+def _ganador_partido(p: "models.Partido") -> Optional[str]:
+    """Devuelve 'local', 'visitante' o None (empate sin penales) para un
+    partido, contemplando la definición por penales cuando el resultado
+    quedó igualado en el marcador."""
+    gl = sum(1 for g in p.goles if g.equipo.strip().lower() == p.equipo_local.strip().lower())
+    gv = sum(1 for g in p.goles if g.equipo.strip().lower() == p.equipo_visitante.strip().lower())
+    if gl > gv:
+        return "local"
+    if gv > gl:
+        return "visitante"
+    # Empate en el marcador: si se definió por penales, ese es el ganador.
+    if p.penales and p.penales_ganador:
+        if p.penales_ganador.strip().lower() == p.equipo_local.strip().lower():
+            return "local"
+        if p.penales_ganador.strip().lower() == p.equipo_visitante.strip().lower():
+            return "visitante"
+    return None
+
+
 def _filtrar_por_partido(query, competicion: Optional[str], anio: Optional[int]):
     """Aplica los filtros opcionales de competición/año sobre un query
     que ya tiene un JOIN con la tabla partidos."""
@@ -523,13 +572,14 @@ def resumen_estadisticas(competicion: Optional[str] = None, anio: Optional[int] 
     total_goles = sum(len(p.goles) for p in partidos)
     promedio = round(total_goles / total_partidos, 2) if total_partidos else 0
 
+    # Nota: un partido definido por penales cuenta como victoria (no
+    # empate) para el equipo que se quedó con los penales.
     gana_local = gana_visitante = empates = 0
     for p in partidos:
-        gl = sum(1 for g in p.goles if g.equipo.strip().lower() == p.equipo_local.strip().lower())
-        gv = sum(1 for g in p.goles if g.equipo.strip().lower() == p.equipo_visitante.strip().lower())
-        if gl > gv:
+        ganador = _ganador_partido(p)
+        if ganador == "local":
             gana_local += 1
-        elif gv > gl:
+        elif ganador == "visitante":
             gana_visitante += 1
         else:
             empates += 1
@@ -644,21 +694,19 @@ def top_equipos_victorias(
     anio: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-    # No hay un campo "ganador" guardado en ningún lado: se calcula acá
-    # comparando, partido por partido, cuántos goles metió cada equipo
-    # (mismo criterio que usan las tarjetas de partido y "Local vs
-    # Visitante" en el frontend). Los empates no suman victoria a nadie.
+    # El ganador se calcula acá partido por partido (goles, y si quedó
+    # empatado, quién ganó los penales). Los empates sin definición por
+    # penales no suman victoria a nadie.
     query = db.query(models.Partido)
     query = _filtrar_por_partido(query, competicion, anio)
     partidos = query.all()
 
     victorias: dict[str, int] = {}
     for p in partidos:
-        gl = sum(1 for g in p.goles if g.equipo.strip().lower() == p.equipo_local.strip().lower())
-        gv = sum(1 for g in p.goles if g.equipo.strip().lower() == p.equipo_visitante.strip().lower())
-        if gl > gv:
+        resultado = _ganador_partido(p)
+        if resultado == "local":
             ganador = p.equipo_local
-        elif gv > gl:
+        elif resultado == "visitante":
             ganador = p.equipo_visitante
         else:
             continue

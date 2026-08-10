@@ -114,6 +114,11 @@ class PartidoBase(BaseModel):
     estadio: Optional[str] = None
     instancia: str
     fecha_partido: date
+    # Si el partido (mata-mata) terminó empatado y se definió por penales.
+    penales: bool = False
+    # Nombre del equipo que ganó en penales (tiene que ser el local o el
+    # visitante). Solo tiene sentido si penales=True.
+    penales_ganador: Optional[str] = None
 
 class PartidoCreate(PartidoBase):
     pass
