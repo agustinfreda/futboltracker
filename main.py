@@ -291,16 +291,24 @@ def _serializar_jugador(jugador: models.Jugador, db: Session) -> dict:
 @app.get("/jugadores/", response_model=List[schemas.JugadorResponse])
 def obtener_jugadores(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(20, ge=1, le=500),
+    equipo: Optional[str] = None,
+    q: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    jugadores = (
-        db.query(models.Jugador)
-        .order_by(models.Jugador.nombre)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    query = db.query(models.Jugador)
+    if equipo:
+        # Jugadores que anotaron al menos un gol para ese equipo.
+        query = query.filter(
+            models.Jugador.id.in_(
+                db.query(models.Gol.jugador_id).filter(
+                    func.lower(models.Gol.equipo) == equipo.strip().lower()
+                )
+            )
+        )
+    if q:
+        query = query.filter(models.Jugador.nombre.ilike(f"%{q.strip()}%"))
+    jugadores = query.order_by(models.Jugador.nombre).offset(skip).limit(limit).all()
     return _serializar_jugadores(jugadores, db)
 
 
@@ -412,23 +420,55 @@ def _validar_penales(local: str, visitante: str, penales: bool, penales_ganador:
 @app.get("/partidos/", response_model=List[schemas.PartidoResponse])
 def obtener_partidos(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(20, ge=1, le=500),
+    competicion: Optional[str] = None,
+    anio: Optional[int] = None,
+    equipo: Optional[str] = None,
+    q: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    # selectinload trae los goles de todos los partidos en UNA query
-    # (con un WHERE partido_id IN (...)) y los jugadores de esos goles
-    # en OTRA query (con un WHERE jugador_id IN (...)), en vez de
-    # disparar una query por partido y otra por gol (lazy loading, que
-    # es lo que hacía esto antes: con 100 partidos y ~3 goles c/u,
-    # más de 400 queries para un solo GET).
+    # Filtros server-side: antes el frontend traía TODOS los partidos y
+    # filtraba en JS con partidosMemoria.filter(...). Para poder paginar
+    # de a 20 con un botón "Cargar más", el filtrado tiene que pasar acá,
+    # si no cada página de 20 solo filtraría dentro de esos 20.
+    query = db.query(models.Partido).options(
+        selectinload(models.Partido.goles).selectinload(models.Gol.jugador)
+    )
+    if competicion:
+        query = query.filter(func.lower(models.Partido.competicion) == competicion.strip().lower())
+    if anio:
+        query = query.filter(extract("year", models.Partido.fecha_partido) == anio)
+    if equipo:
+        query = query.filter(
+            (func.lower(models.Partido.equipo_local) == equipo.strip().lower())
+            | (func.lower(models.Partido.equipo_visitante) == equipo.strip().lower())
+        )
+    if q:
+        patron = f"%{q.strip().lower()}%"
+        query = query.filter(
+            func.lower(models.Partido.equipo_local).like(patron)
+            | func.lower(models.Partido.equipo_visitante).like(patron)
+            | func.lower(models.Partido.competicion).like(patron)
+        )
     return (
-        db.query(models.Partido)
-        .options(selectinload(models.Partido.goles).selectinload(models.Gol.jugador))
-        .order_by(models.Partido.fecha_partido.desc())
+        query.order_by(models.Partido.fecha_partido.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+
+
+@app.get("/partidos/anios-disponibles")
+def anios_disponibles_partidos(db: Session = Depends(get_db)):
+    """Lista de años distintos con partidos cargados, para poblar el
+    filtro de año sin tener que traer todos los partidos al frontend."""
+    filas = (
+        db.query(extract("year", models.Partido.fecha_partido))
+        .distinct()
+        .order_by(extract("year", models.Partido.fecha_partido).desc())
+        .all()
+    )
+    return [int(fila[0]) for fila in filas]
 
 
 @app.post("/partidos/", response_model=schemas.PartidoResponse)

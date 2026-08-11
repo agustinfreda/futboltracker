@@ -123,6 +123,11 @@
             <div id="lista-partidos" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 <!-- Carga dinámica -->
             </div>
+            <div class="flex justify-center">
+                <button id="btn-cargar-mas-partidos" onclick="cargarMasPartidos()" class="hidden text-sm bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-4 py-2 rounded-lg transition-colors">
+                    Cargar más partidos
+                </button>
+            </div>
         </section>
 
 
@@ -184,6 +189,11 @@
                         <!-- Carga dinámica -->
                     </tbody>
                 </table>
+                <div class="flex justify-center p-4 border-t border-slate-700/60">
+                    <button id="btn-cargar-mas-jugadores" onclick="cargarMasJugadores()" class="hidden text-sm bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-300 px-4 py-2 rounded-lg transition-colors">
+                        Cargar más jugadores
+                    </button>
+                </div>
             </div>
         </section>
 
@@ -613,6 +623,9 @@
         // hosts distintos, acá va la URL completa del backend.
         const API_URL = "";
         let partidosMemoria = [];
+        const PARTIDOS_PAGE_SIZE = 20;
+        let partidosSkip = 0;
+        let partidosHayMas = true;
         let equiposMemoria = [];
         let estadiosMemoria = [];
         let campoEquipoTarget = null; // Para saber cuál selector actualizar cuando se crea un equipo rápido
@@ -842,15 +855,65 @@
         }
 
         // --- PARTIDOS VISTOS ---
+        let anioOpcionesCache = [];
+
+        // Trae la primera página (20) desde cero, aplicando los filtros
+        // actuales. Se llama al entrar a la pestaña y cada vez que cambia
+        // un filtro (texto, competición, año o equipo).
         async function cargarPartidos() {
             await cargarEquipos();
             await cargarEstadios();
             await cargarCompeticiones();
             await cargarInstancias();
-            const res = await fetch(`${API_URL}/partidos/`);
-            partidosMemoria = await res.json();
+            if (anioOpcionesCache.length === 0) {
+                try {
+                    const res = await fetch(`${API_URL}/partidos/anios-disponibles`);
+                    anioOpcionesCache = await res.json();
+                } catch (e) { anioOpcionesCache = []; }
+            }
             poblarFiltrosPartidos();
-            aplicarFiltrosPartidos();
+            partidosSkip = 0;
+            partidosHayMas = true;
+            partidosMemoria = await fetchPaginaPartidos(0);
+            partidosSkip = partidosMemoria.length;
+            partidosHayMas = partidosMemoria.length === PARTIDOS_PAGE_SIZE;
+            renderPartidos(partidosMemoria);
+            actualizarBotonCargarMasPartidos();
+        }
+
+        // Trae la siguiente página y la agrega a la ya cargada, sin pisarla.
+        async function cargarMasPartidos() {
+            if (!partidosHayMas) return;
+            const nuevos = await fetchPaginaPartidos(partidosSkip);
+            partidosMemoria = partidosMemoria.concat(nuevos);
+            partidosSkip += nuevos.length;
+            partidosHayMas = nuevos.length === PARTIDOS_PAGE_SIZE;
+            renderPartidos(partidosMemoria);
+            actualizarBotonCargarMasPartidos();
+        }
+
+        function actualizarBotonCargarMasPartidos() {
+            document.getElementById('btn-cargar-mas-partidos').classList.toggle('hidden', !partidosHayMas);
+        }
+
+        function filtrosPartidosActuales() {
+            return {
+                q: document.getElementById('filtro-partidos').value.trim(),
+                competicion: document.getElementById('filtro-competicion').value,
+                anio: document.getElementById('filtro-anio').value,
+                equipo: document.getElementById('filtro-equipo').value,
+            };
+        }
+
+        async function fetchPaginaPartidos(skip) {
+            const f = filtrosPartidosActuales();
+            const params = new URLSearchParams({ skip, limit: PARTIDOS_PAGE_SIZE });
+            if (f.q) params.set('q', f.q);
+            if (f.competicion) params.set('competicion', f.competicion);
+            if (f.anio) params.set('anio', f.anio);
+            if (f.equipo) params.set('equipo', f.equipo);
+            const res = await fetch(`${API_URL}/partidos/?${params.toString()}`);
+            return res.json();
         }
 
         function renderPartidos(partidos) {
@@ -967,6 +1030,13 @@
 
         // Puebla las 3 listas desplegables de filtros con los valores
         // realmente presentes en los partidos cargados.
+        // Antes esto derivaba las opciones de competición/año/equipo de
+        // partidosMemoria (todos los partidos cargados en memoria). Ahora
+        // que partidosMemoria solo tiene la página visible (20, 40, 60...
+        // según cuánto se apretó "Cargar más"), usamos las listas maestras
+        // que ya se cargan aparte (equiposMemoria, competicionesMemoria) y
+        // el endpoint de años dedicado, para que las opciones del filtro
+        // muestren SIEMPRE todo lo disponible, no solo lo ya traído.
         function poblarFiltrosPartidos() {
             const selComp = document.getElementById('filtro-competicion');
             const selAnio = document.getElementById('filtro-anio');
@@ -976,40 +1046,36 @@
             const valorAnio = selAnio.value;
             const valorEquipo = selEquipo.value;
 
-            const competiciones = [...new Set(partidosMemoria.map(p => p.competicion))].sort();
-            const anios = [...new Set(partidosMemoria.map(p => p.fecha_partido.slice(0, 4)))].sort().reverse();
-            const equipos = [...new Set(partidosMemoria.flatMap(p => [p.equipo_local, p.equipo_visitante]))].sort();
+            const competiciones = [...new Set(competicionesMemoria.map(c => c.nombre))].sort();
+            const equipos = [...new Set(equiposMemoria.map(e => e.nombre))].sort();
 
             selComp.innerHTML = `<option value="">Todas las competiciones</option>` +
                 competiciones.map(c => `<option value="${c}">${c}</option>`).join('');
             selAnio.innerHTML = `<option value="">Todos los años</option>` +
-                anios.map(a => `<option value="${a}">${a}</option>`).join('');
+                anioOpcionesCache.map(a => `<option value="${a}">${a}</option>`).join('');
             selEquipo.innerHTML = `<option value="">Todos los equipos</option>` +
                 equipos.map(e => `<option value="${e}">${e}</option>`).join('');
 
             if (competiciones.includes(valorComp)) selComp.value = valorComp;
-            if (anios.includes(valorAnio)) selAnio.value = valorAnio;
+            if (anioOpcionesCache.map(String).includes(valorAnio)) selAnio.value = valorAnio;
             if (equipos.includes(valorEquipo)) selEquipo.value = valorEquipo;
         }
 
-        // Combina el texto libre + los 3 selects de filtro y renderiza el resultado.
+        // El filtrado ahora lo hace el backend (ver fetchPaginaPartidos),
+        // así que esto ya no filtra en JS: solo reinicia la paginación y
+        // pide la página 1 con los filtros actuales.
+        let filtroPartidosTimeout = null;
         function aplicarFiltrosPartidos() {
-            const q = document.getElementById('filtro-partidos').value.toLowerCase();
-            const competicion = document.getElementById('filtro-competicion').value;
-            const anio = document.getElementById('filtro-anio').value;
-            const equipo = document.getElementById('filtro-equipo').value;
-
-            const filtrados = partidosMemoria.filter(p => {
-                const coincideTexto = !q ||
-                    p.equipo_local.toLowerCase().includes(q) ||
-                    p.equipo_visitante.toLowerCase().includes(q) ||
-                    p.competicion.toLowerCase().includes(q);
-                const coincideCompeticion = !competicion || p.competicion === competicion;
-                const coincideAnio = !anio || p.fecha_partido.slice(0, 4) === anio;
-                const coincideEquipo = !equipo || p.equipo_local === equipo || p.equipo_visitante === equipo;
-                return coincideTexto && coincideCompeticion && coincideAnio && coincideEquipo;
-            });
-            renderPartidos(filtrados);
+            clearTimeout(filtroPartidosTimeout);
+            filtroPartidosTimeout = setTimeout(async () => {
+                partidosSkip = 0;
+                partidosHayMas = true;
+                partidosMemoria = await fetchPaginaPartidos(0);
+                partidosSkip = partidosMemoria.length;
+                partidosHayMas = partidosMemoria.length === PARTIDOS_PAGE_SIZE;
+                renderPartidos(partidosMemoria);
+                actualizarBotonCargarMasPartidos();
+            }, 250); // pequeño debounce para no disparar un fetch por cada tecla
         }
 
         function limpiarFiltrosPartidos() {
@@ -1130,20 +1196,54 @@
 
         // --- JUGADORES ---
         let listaJugadoresMemoria = [];
+        const JUGADORES_PAGE_SIZE = 20;
+        let jugadoresSkip = 0;
+        let jugadoresHayMas = true;
+
         async function cargarJugadores() {
             await cargarEquipos();
-            const res = await fetch(`${API_URL}/jugadores/`);
-            listaJugadoresMemoria = await res.json();
             poblarFiltroJugadoresEquipo();
-            aplicarFiltrosJugadores();
+            jugadoresSkip = 0;
+            jugadoresHayMas = true;
+            listaJugadoresMemoria = await fetchPaginaJugadores(0);
+            jugadoresSkip = listaJugadoresMemoria.length;
+            jugadoresHayMas = listaJugadoresMemoria.length === JUGADORES_PAGE_SIZE;
+            renderTablaJugadores(listaJugadoresMemoria);
+            actualizarBotonCargarMasJugadores();
         }
 
+        async function cargarMasJugadores() {
+            if (!jugadoresHayMas) return;
+            const nuevos = await fetchPaginaJugadores(jugadoresSkip);
+            listaJugadoresMemoria = listaJugadoresMemoria.concat(nuevos);
+            jugadoresSkip += nuevos.length;
+            jugadoresHayMas = nuevos.length === JUGADORES_PAGE_SIZE;
+            renderTablaJugadores(listaJugadoresMemoria);
+            actualizarBotonCargarMasJugadores();
+        }
+
+        function actualizarBotonCargarMasJugadores() {
+            document.getElementById('btn-cargar-mas-jugadores').classList.toggle('hidden', !jugadoresHayMas);
+        }
+
+        async function fetchPaginaJugadores(skip) {
+            const q = document.getElementById('buscar-tabla-jugadores').value.trim();
+            const equipo = document.getElementById('filtro-jugadores-equipo').value;
+            const params = new URLSearchParams({ skip, limit: JUGADORES_PAGE_SIZE });
+            if (q) params.set('q', q);
+            if (equipo) params.set('equipo', equipo);
+            const res = await fetch(`${API_URL}/jugadores/?${params.toString()}`);
+            return res.json();
+        }
+
+        // El dropdown de clubes se puebla con la lista maestra de equipos
+        // (equiposMemoria), no con los clubes vistos en la página de 20
+        // jugadores cargada — así siempre aparecen todos los clubes
+        // aunque el jugador correspondiente todavía no se haya traído.
         function poblarFiltroJugadoresEquipo() {
             const sel = document.getElementById('filtro-jugadores-equipo');
             const valorActual = sel.value;
-            // "equipos" es la lista de clubes por los que anotó, calculada
-            // en el backend a partir de sus goles (ver GET /jugadores/).
-            const equipos = [...new Set(listaJugadoresMemoria.flatMap(j => j.equipos || []))].sort();
+            const equipos = [...new Set(equiposMemoria.map(e => e.nombre))].sort();
             sel.innerHTML = `<option value="">Todos los clubes</option>` +
                 equipos.map(e => `<option value="${e}">${e}</option>`).join('');
             if (equipos.includes(valorActual)) sel.value = valorActual;
@@ -1192,15 +1292,20 @@
             } catch (err) { /* el mensaje ya se mostró en apiRequest */ }
         }
 
+        // Igual que con partidos: el filtro ahora lo resuelve el backend,
+        // así que esto reinicia la paginación y pide la página 1 filtrada.
+        let filtroJugadoresTimeout = null;
         function aplicarFiltrosJugadores() {
-            const q = document.getElementById('buscar-tabla-jugadores').value.toLowerCase();
-            const equipo = document.getElementById('filtro-jugadores-equipo').value;
-            const filtrados = listaJugadoresMemoria.filter(j => {
-                const coincideTexto = !q || j.nombre.toLowerCase().includes(q);
-                const coincideEquipo = !equipo || (j.equipos && j.equipos.includes(equipo));
-                return coincideTexto && coincideEquipo;
-            });
-            renderTablaJugadores(filtrados);
+            clearTimeout(filtroJugadoresTimeout);
+            filtroJugadoresTimeout = setTimeout(async () => {
+                jugadoresSkip = 0;
+                jugadoresHayMas = true;
+                listaJugadoresMemoria = await fetchPaginaJugadores(0);
+                jugadoresSkip = listaJugadoresMemoria.length;
+                jugadoresHayMas = listaJugadoresMemoria.length === JUGADORES_PAGE_SIZE;
+                renderTablaJugadores(listaJugadoresMemoria);
+                actualizarBotonCargarMasJugadores();
+            }, 250);
         }
 
         async function guardarJugador(e) {
@@ -1384,14 +1489,13 @@
         async function poblarFiltrosEstadisticas() {
             if (filtrosEstadisticasCargados) return;
             try {
-                const [resComp, resPart] = await Promise.all([
+                const [resComp, resAnios] = await Promise.all([
                     fetch(`${API_URL}/competiciones/`),
-                    fetch(`${API_URL}/partidos/`)
+                    fetch(`${API_URL}/partidos/anios-disponibles`)
                 ]);
                 const competiciones = await resComp.json();
-                const partidos = await resPart.json();
+                const anios = await resAnios.json();
                 const nombresUnicos = [...new Set(competiciones.map(c => c.nombre))].sort();
-                const anios = [...new Set(partidos.map(p => p.fecha_partido.slice(0, 4)))].sort().reverse();
 
                 document.getElementById('stats-filtro-competicion').innerHTML =
                     `<option value="">Todas las competiciones</option>` +
