@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, UniqueConstraint, Index, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -113,3 +113,33 @@ class Gol(Base):
 
     partido = relationship("Partido", back_populates="goles")
     jugador = relationship("Jugador", back_populates="goles")
+
+
+# ==========================================
+# ÍNDICES FUNCIONALES
+# ==========================================
+# En main.py, las validaciones de "ya existe" y varios filtros comparan
+# con func.lower(columna) para ser case-insensitive. Un índice normal
+# sobre la columna NO se usa en esa comparación, así que cada creación
+# de equipo/estadio/competición/instancia/jugador termina haciendo un
+# table scan para chequear duplicados. Estos índices funcionales
+# arreglan eso (soportado en PostgreSQL y MySQL 8+; en MySQL 5.7 o
+# SQLite se ignoran sin romper nada, simplemente no aceleran la query).
+Index("ix_equipos_nombre_lower", func.lower(Equipo.nombre))
+Index("ix_estadios_nombre_lower", func.lower(Estadio.nombre))
+Index("ix_competiciones_nombre_lower", func.lower(Competicion.nombre))
+Index("ix_instancias_nombre_lower", func.lower(Instancia.nombre))
+Index("ix_jugadores_nombre_lower", func.lower(Jugador.nombre))
+
+# Índices sobre columnas de texto usadas para filtrar/agrupar partidos
+# y goles por equipo (equipo_local, equipo_visitante, Gol.equipo no son
+# FK, son texto libre) y por competición/instancia/fecha, que hoy no
+# tienen índice y se usan constantemente en WHERE, JOIN y GROUP BY.
+Index("ix_partidos_equipo_local", Partido.equipo_local)
+Index("ix_partidos_equipo_visitante", Partido.equipo_visitante)
+Index("ix_partidos_competicion", Partido.competicion)
+Index("ix_partidos_instancia", Partido.instancia)
+Index("ix_partidos_fecha_partido", Partido.fecha_partido)
+Index("ix_goles_equipo", Gol.equipo)
+Index("ix_goles_jugador_id", Gol.jugador_id)
+Index("ix_goles_partido_id", Gol.partido_id)

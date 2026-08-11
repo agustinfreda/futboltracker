@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import extract, func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 # Crear tablas en BD si no existen
 models.Base.metadata.create_all(bind=engine)
@@ -249,27 +249,59 @@ def borrar_instancia(instancia_id: int, db: Session = Depends(get_db)):
 # ==========================================
 # ENDPOINTS JUGADORES
 # ==========================================
+def _mapa_equipos_por_jugador(jugador_ids: List[int], db: Session) -> dict[int, list[str]]:
+    """Trae en UNA sola query los equipos distintos por los que anotó
+    cada jugador (en vez de una query por jugador, que es lo que hacía
+    _serializar_jugador antes y generaba un N+1 con listas grandes)."""
+    if not jugador_ids:
+        return {}
+    filas = (
+        db.query(models.Gol.jugador_id, models.Gol.equipo)
+        .filter(models.Gol.jugador_id.in_(jugador_ids))
+        .distinct()
+        .all()
+    )
+    mapa: dict[int, set[str]] = {}
+    for jugador_id, equipo in filas:
+        mapa.setdefault(jugador_id, set()).add(equipo)
+    return {jid: sorted(equipos) for jid, equipos in mapa.items()}
+
+
+def _serializar_jugadores(jugadores: List[models.Jugador], db: Session) -> List[dict]:
+    mapa_equipos = _mapa_equipos_por_jugador([j.id for j in jugadores], db)
+    return [
+        {
+            "id": j.id,
+            "nombre": j.nombre,
+            "nacionalidad": j.nacionalidad,
+            "posicion": j.posicion,
+            "edad": j.edad,
+            "equipos": mapa_equipos.get(j.id, []),
+        }
+        for j in jugadores
+    ]
+
+
 def _serializar_jugador(jugador: models.Jugador, db: Session) -> dict:
-    # El club de un jugador NO se guarda como campo fijo: se calcula acá,
-    # leyendo los equipos distintos por los que anotó (Gol.equipo), que
-    # a su vez sale del partido en el que se cargó cada gol. Así, si
-    # Cavani anotó para Boca y después para Nacional, esta lista muestra
-    # ambos — cada gol respeta el club de su propio partido.
-    filas = db.query(models.Gol.equipo).filter(models.Gol.jugador_id == jugador.id).distinct().all()
-    return {
-        "id": jugador.id,
-        "nombre": jugador.nombre,
-        "nacionalidad": jugador.nacionalidad,
-        "posicion": jugador.posicion,
-        "edad": jugador.edad,
-        "equipos": sorted({fila[0] for fila in filas}),
-    }
+    """Versión para un solo jugador (alta/edición), donde no tiene
+    sentido armar el mapa completo."""
+    return _serializar_jugadores([jugador], db)[0]
 
 
 @app.get("/jugadores/", response_model=List[schemas.JugadorResponse])
-def obtener_jugadores(db: Session = Depends(get_db)):
-    jugadores = db.query(models.Jugador).order_by(models.Jugador.nombre).all()
-    return [_serializar_jugador(j, db) for j in jugadores]
+def obtener_jugadores(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    jugadores = (
+        db.query(models.Jugador)
+        .order_by(models.Jugador.nombre)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return _serializar_jugadores(jugadores, db)
 
 
 @app.get("/jugadores/buscar/", response_model=List[schemas.JugadorResponse])
@@ -277,7 +309,7 @@ def buscar_jugadores(nombre: str = Query(..., min_length=1), db: Session = Depen
     jugadores = db.query(models.Jugador).filter(
         models.Jugador.nombre.ilike(f"%{nombre}%")
     ).limit(10).all()
-    return [_serializar_jugador(j, db) for j in jugadores]
+    return _serializar_jugadores(jugadores, db)
 
 
 @app.post("/jugadores/", response_model=schemas.JugadorResponse)
@@ -378,8 +410,25 @@ def _validar_penales(local: str, visitante: str, penales: bool, penales_ganador:
 
 
 @app.get("/partidos/", response_model=List[schemas.PartidoResponse])
-def obtener_partidos(db: Session = Depends(get_db)):
-    return db.query(models.Partido).order_by(models.Partido.fecha_partido.desc()).all()
+def obtener_partidos(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    # selectinload trae los goles de todos los partidos en UNA query
+    # (con un WHERE partido_id IN (...)) y los jugadores de esos goles
+    # en OTRA query (con un WHERE jugador_id IN (...)), en vez de
+    # disparar una query por partido y otra por gol (lazy loading, que
+    # es lo que hacía esto antes: con 100 partidos y ~3 goles c/u,
+    # más de 400 queries para un solo GET).
+    return (
+        db.query(models.Partido)
+        .options(selectinload(models.Partido.goles).selectinload(models.Gol.jugador))
+        .order_by(models.Partido.fecha_partido.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 @app.post("/partidos/", response_model=schemas.PartidoResponse)
@@ -564,12 +613,24 @@ def _filtrar_por_partido(query, competicion: Optional[str], anio: Optional[int])
 
 @app.get("/estadisticas/resumen")
 def resumen_estadisticas(competicion: Optional[str] = None, anio: Optional[int] = None, db: Session = Depends(get_db)):
-    query = db.query(models.Partido)
+    # Determinar el ganador de cada partido (goles + penales) es lógica
+    # que no vale la pena migrar 1:1 a SQL, pero cargar los goles con
+    # selectinload evita el N+1 de antes: antes, cada acceso a p.goles
+    # dentro del for de más abajo disparaba una query por partido.
+    query = db.query(models.Partido).options(selectinload(models.Partido.goles))
     query = _filtrar_por_partido(query, competicion, anio)
     partidos = query.all()
 
     total_partidos = len(partidos)
-    total_goles = sum(len(p.goles) for p in partidos)
+
+    # El conteo de goles sí se resuelve en SQL directamente (una sola
+    # query agregada), en vez de sumar len(p.goles) en Python.
+    goles_query = db.query(func.count(models.Gol.id)).join(
+        models.Partido, models.Gol.partido_id == models.Partido.id
+    )
+    goles_query = _filtrar_por_partido(goles_query, competicion, anio)
+    total_goles = goles_query.scalar() or 0
+
     promedio = round(total_goles / total_partidos, 2) if total_partidos else 0
 
     # Nota: un partido definido por penales cuenta como victoria (no
@@ -696,8 +757,9 @@ def top_equipos_victorias(
 ):
     # El ganador se calcula acá partido por partido (goles, y si quedó
     # empatado, quién ganó los penales). Los empates sin definición por
-    # penales no suman victoria a nadie.
-    query = db.query(models.Partido)
+    # penales no suman victoria a nadie. selectinload evita el N+1 al
+    # leer p.goles dentro de _ganador_partido más abajo.
+    query = db.query(models.Partido).options(selectinload(models.Partido.goles))
     query = _filtrar_por_partido(query, competicion, anio)
     partidos = query.all()
 
