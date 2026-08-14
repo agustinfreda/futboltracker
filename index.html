@@ -754,8 +754,22 @@
                 ? equiposMemoria.map(e => `<option value="${e.nombre}">${e.nombre}</option>`).join('')
                 : `<option value="">Sin equipos registrados</option>`;
 
-            document.getElementById('p-local-select').innerHTML = opciones;
-            document.getElementById('p-visitante-select').innerHTML = opciones;
+            // Reconstruir el <select> con innerHTML resetea la selección a la
+            // primera opción, así que guardamos el valor actual antes de
+            // pisarlo y lo restauramos después (mismo criterio que en
+            // cargarCompeticiones), para no perder lo ya elegido si esto se
+            // dispara con el formulario de partido todavía abierto.
+            const selectLocal = document.getElementById('p-local-select');
+            const selectVisitante = document.getElementById('p-visitante-select');
+            const valorLocalPrevio = selectLocal.value;
+            const valorVisitantePrevio = selectVisitante.value;
+            const nombresDisponibles = equiposMemoria.map(e => e.nombre);
+
+            selectLocal.innerHTML = opciones;
+            selectVisitante.innerHTML = opciones;
+
+            if (nombresDisponibles.includes(valorLocalPrevio)) selectLocal.value = valorLocalPrevio;
+            if (nombresDisponibles.includes(valorVisitantePrevio)) selectVisitante.value = valorVisitantePrevio;
         }
 
         // --- ESTADIOS ---
@@ -767,7 +781,10 @@
                 estadiosMemoria = [];
             }
             const opciones = estadiosMemoria.map(e => `<option value="${e.nombre}">${e.nombre}${e.ciudad ? ' — ' + e.ciudad : ''}</option>`).join('');
-            document.getElementById('p-estadio-select').innerHTML = `<option value="">Sin especificar</option>` + opciones;
+            const select = document.getElementById('p-estadio-select');
+            const valorPrevio = select.value;
+            select.innerHTML = `<option value="">Sin especificar</option>` + opciones;
+            if (estadiosMemoria.some(e => e.nombre === valorPrevio)) select.value = valorPrevio;
         }
 
         function abrirModalCrearEstadio() {
@@ -1015,7 +1032,10 @@
                 instanciasMemoria = [];
             }
             const opciones = instanciasMemoria.map(i => `<option value="${i.nombre}">${i.nombre}</option>`).join('');
-            document.getElementById('p-instancia-select').innerHTML = opciones || `<option value="">Sin instancias registradas</option>`;
+            const select = document.getElementById('p-instancia-select');
+            const valorPrevio = select.value;
+            select.innerHTML = opciones || `<option value="">Sin instancias registradas</option>`;
+            if (instanciasMemoria.some(i => i.nombre === valorPrevio)) select.value = valorPrevio;
         }
 
         function abrirModalCrearInstancia() {
@@ -1328,7 +1348,6 @@
         async function abrirModalEditarPartido(partido) {
             document.getElementById('p-edit-id').value = partido.id;
             document.getElementById('p-competicion-select').value = partido.competicion;
-            await onCambiarCompeticionPartido(partido.temporada || '');
             document.getElementById('p-local-select').value = partido.equipo_local;
             document.getElementById('p-visitante-select').value = partido.equipo_visitante;
             document.getElementById('p-estadio-select').value = partido.estadio || '';
@@ -1342,6 +1361,10 @@
             document.getElementById('modal-partido-titulo').innerHTML = '<i class="fa-solid fa-pen text-emerald-400 mr-2"></i>Editar Partido';
             document.getElementById('p-submit-btn').textContent = 'Guardar Cambios';
             document.getElementById('modal-partido').classList.remove('hidden');
+            // La carga de ediciones (fetch) va al final, con el modal ya
+            // visible y TODOS los demás campos ya completos: si esta
+            // petición tarda o falla, no deja el formulario a medias.
+            await onCambiarCompeticionPartido(partido.temporada || '');
         }
 
         function cerrarModalNuevoPartido() {
