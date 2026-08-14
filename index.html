@@ -310,7 +310,10 @@
                 <div>
                     <div class="flex justify-between items-center mb-1">
                         <label class="block text-xs font-medium text-slate-400">Competición</label>
-                        <button type="button" onclick="abrirModalCrearCompeticion()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nueva</button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="abrirModalEditarNombreCompeticion()" title="Corregir el nombre" class="text-[11px] text-slate-400 hover:text-emerald-400 hover:underline">✎ Editar</button>
+                            <button type="button" onclick="abrirModalCrearCompeticion()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nueva</button>
+                        </div>
                     </div>
                     <select id="p-competicion-select" required onchange="onCambiarCompeticionPartido()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                         <!-- Carga dinámica -->
@@ -320,7 +323,10 @@
                 <div>
                     <div class="flex justify-between items-center mb-1">
                         <label class="block text-xs font-medium text-slate-400">Edición / Temporada</label>
-                        <button type="button" onclick="toggleNuevaEdicionPartido()" class="text-[11px] text-emerald-400 hover:underline">＋ Nueva edición</button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="abrirModalEditarEdicion()" title="Corregir esta edición" class="text-[11px] text-slate-400 hover:text-emerald-400 hover:underline">✎ Editar</button>
+                            <button type="button" onclick="toggleNuevaEdicionPartido()" class="text-[11px] text-emerald-400 hover:underline">＋ Nueva edición</button>
+                        </div>
                     </div>
                     <select id="p-edicion-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                         <option value="">Sin edición específica</option>
@@ -473,6 +479,54 @@
                 </div>
                 <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
                     Guardar Competición
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2c-bis: EDITAR NOMBRE DE COMPETICIÓN (POPUP) -->
+    <div id="modal-editar-nombre-competicion" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalEditarNombreCompeticion()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-pen text-emerald-400 mr-2"></i>Corregir Nombre de Competición
+            </h3>
+            <p class="text-[11px] text-slate-500 -mt-2">Corrige TODAS las ediciones cargadas con este nombre (y los partidos que ya lo usan), no solo la edición actual.</p>
+
+            <form onsubmit="guardarNombreCompeticionEditado(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Nombre correcto</label>
+                    <input type="text" id="edit-comp-nombre" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
+                    Guardar Corrección
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2c-ter: EDITAR EDICIÓN/TEMPORADA (POPUP) -->
+    <div id="modal-editar-edicion" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalEditarEdicion()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="fa-solid fa-pen text-emerald-400 mr-2"></i>Corregir Edición / Temporada
+            </h3>
+            <p class="text-[11px] text-slate-500 -mt-2">Corrige solo esta edición de <span id="edit-edicion-comp-nombre" class="text-slate-400"></span>. No afecta a las demás ediciones.</p>
+
+            <form onsubmit="guardarEdicionEditada(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Año / Edición correcta</label>
+                    <input type="text" id="edit-edicion-valor" placeholder="Dejalo vacío para quitarle la edición" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
+                    Guardar Corrección
                 </button>
             </form>
         </div>
@@ -748,7 +802,7 @@
 
         // --- COMPETICIONES ---
         let competicionesMemoria = [];
-        async function cargarCompeticiones() {
+        async function cargarCompeticiones(forzarSeleccion) {
             try {
                 const res = await fetch(`${API_URL}/competiciones/`);
                 competicionesMemoria = await res.json();
@@ -759,8 +813,14 @@
             // su propia fecha, de ahí sale el año), así que se muestran nombres
             // únicos aunque haya varias temporadas cargadas con ese nombre.
             const nombresUnicos = [...new Set(competicionesMemoria.map(c => c.nombre))].sort();
+            const select = document.getElementById('p-competicion-select');
+            // Reconstruir el <select> con innerHTML resetea la selección a la
+            // primera opción, así que guardamos el valor actual antes de
+            // pisarlo y lo restauramos después (o forzamos el que nos pasen).
+            const valorPrevio = forzarSeleccion !== undefined ? forzarSeleccion : select.value;
             const opciones = nombresUnicos.map(n => `<option value="${n}">${n}</option>`).join('');
-            document.getElementById('p-competicion-select').innerHTML = opciones || `<option value="">Sin competiciones registradas</option>`;
+            select.innerHTML = opciones || `<option value="">Sin competiciones registradas</option>`;
+            if (nombresUnicos.includes(valorPrevio)) select.value = valorPrevio;
         }
 
         function abrirModalCrearCompeticion() {
@@ -860,6 +920,89 @@
 
             await cargarCompeticiones();
             await onCambiarCompeticionPartido(competicionCreada.temporada);
+        }
+
+        // --- EDITAR NOMBRE DE COMPETICIÓN (corrige todas sus ediciones) ---
+        function abrirModalEditarNombreCompeticion() {
+            const nombreActual = document.getElementById('p-competicion-select').value;
+            if (!nombreActual) {
+                alert('Elegí primero una competición.');
+                return;
+            }
+            document.getElementById('edit-comp-nombre').value = nombreActual;
+            document.getElementById('modal-editar-nombre-competicion').classList.remove('hidden');
+        }
+
+        function cerrarModalEditarNombreCompeticion() {
+            document.getElementById('modal-editar-nombre-competicion').classList.add('hidden');
+        }
+
+        async function guardarNombreCompeticionEditado(e) {
+            e.preventDefault();
+            const nombreViejo = document.getElementById('p-competicion-select').value;
+            const nombreNuevo = document.getElementById('edit-comp-nombre').value.trim();
+            if (!nombreNuevo) return;
+
+            // El nombre se repite en una fila por cada edición cargada
+            // (misma competición, distinta temporada), así que para
+            // corregirlo hay que actualizar todas esas filas, no solo una.
+            const filas = competicionesMemoria.filter(
+                c => c.nombre.toLowerCase() === nombreViejo.toLowerCase()
+            );
+            try {
+                for (const fila of filas) {
+                    await apiRequest(`${API_URL}/competiciones/${fila.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nombre: nombreNuevo, temporada: fila.temporada })
+                    });
+                }
+            } catch (err) { return; }
+
+            const edicionActual = document.getElementById('p-edicion-select').value;
+            await cargarCompeticiones(nombreNuevo);
+            await onCambiarCompeticionPartido(edicionActual);
+            cerrarModalEditarNombreCompeticion();
+            cargarPartidos();
+        }
+
+        // --- EDITAR UNA EDICIÓN PUNTUAL (no afecta a las demás) ---
+        function abrirModalEditarEdicion() {
+            const nombre = document.getElementById('p-competicion-select').value;
+            const temporadaActual = document.getElementById('p-edicion-select').value;
+            if (!nombre || !temporadaActual) {
+                alert('Elegí primero una edición ya creada para poder corregirla.');
+                return;
+            }
+            document.getElementById('edit-edicion-comp-nombre').textContent = nombre;
+            document.getElementById('edit-edicion-valor').value = temporadaActual;
+            document.getElementById('modal-editar-edicion').classList.remove('hidden');
+        }
+
+        function cerrarModalEditarEdicion() {
+            document.getElementById('modal-editar-edicion').classList.add('hidden');
+        }
+
+        async function guardarEdicionEditada(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('p-competicion-select').value;
+            const temporadaVieja = document.getElementById('p-edicion-select').value;
+            const temporadaNueva = document.getElementById('edit-edicion-valor').value.trim() || null;
+
+            const fila = edicionesPartidoMemoria.find(c => c.temporada === temporadaVieja);
+            if (!fila) return;
+
+            try {
+                await apiRequest(`${API_URL}/competiciones/${fila.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, temporada: temporadaNueva })
+                });
+            } catch (err) { return; }
+
+            await onCambiarCompeticionPartido(temporadaNueva);
+            cerrarModalEditarEdicion();
+            cargarPartidos();
         }
 
         // --- INSTANCIAS ---
