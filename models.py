@@ -75,6 +75,12 @@ class Partido(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     competicion = Column(String(100), nullable=False)
+    # Edición/temporada puntual de esa competición para este partido (ej.
+    # "2026"), a elegir entre las ediciones ya cargadas para el nombre de
+    # competición elegido, o vacía si no aplica. Es texto libre igual que
+    # 'competicion', no FK contra Competicion (mismo criterio que el resto
+    # de los campos de este modelo).
+    temporada = Column(String(20), nullable=True)
     equipo_local = Column(String(100), nullable=False)
     equipo_visitante = Column(String(100), nullable=False)
     estadio = Column(String(150), nullable=True)
@@ -140,6 +146,7 @@ Index("ix_partidos_equipo_visitante", Partido.equipo_visitante)
 Index("ix_partidos_competicion", Partido.competicion)
 Index("ix_partidos_instancia", Partido.instancia)
 Index("ix_partidos_fecha_partido", Partido.fecha_partido)
+Index("ix_partidos_temporada", Partido.temporada)
 Index("ix_goles_equipo", Gol.equipo)
 Index("ix_goles_jugador_id", Gol.jugador_id)
 Index("ix_goles_partido_id", Gol.partido_id)

@@ -1,4 +1,5 @@
 import os
+import re
 from typing import List, Optional
 
 import models
@@ -8,12 +9,34 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import extract, func
+from sqlalchemy import extract, func, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 # Crear tablas en BD si no existen
 models.Base.metadata.create_all(bind=engine)
+
+
+def _asegurar_columna_temporada_partidos():
+    """create_all() SOLO crea tablas que todavía no existen: no agrega
+    columnas nuevas a una tabla que ya está en la base (como 'partidos'
+    en Render, que ya tiene partidos cargados). Como el modelo Partido
+    ahora suma la columna 'temporada', hay que agregarla a mano si
+    todavía no está. Es idempotente (chequea antes de tocar nada) y
+    funciona tanto en Postgres (Render) como en MySQL (desarrollo
+    local). Los partidos ya cargados quedan con temporada = NULL, que
+    es exactamente lo mismo que "sin edición específica".
+    """
+    inspector = inspect(engine)
+    if "partidos" not in inspector.get_table_names():
+        return  # tabla recién creada por create_all(), ya sale con la columna
+    columnas = [c["name"] for c in inspector.get_columns("partidos")]
+    if "temporada" not in columnas:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE partidos ADD COLUMN temporada VARCHAR(20)"))
+
+
+_asegurar_columna_temporada_partidos()
 
 app = FastAPI(title="Futbol Tracker API")
 
@@ -173,6 +196,80 @@ def crear_competicion(competicion: schemas.CompeticionCreate, db: Session = Depe
         raise HTTPException(status_code=400, detail="Esa competición ya existe")
     db.refresh(nueva_competicion)
     return nueva_competicion
+
+
+def _clave_orden_edicion(c: "models.Competicion"):
+    """Para ordenar ediciones de una misma competición de la más reciente
+    a la más antigua. Busca los primeros 4 dígitos del campo temporada
+    (ej. "2026" o "2025/2026" -> 2026... espera, el primer año que
+    aparece; para que "2025/2026" no quede antes que "2026" a secas,
+    ordenamos por el último grupo de 4 dígitos encontrado, no el primero).
+    Si no hay un año detectable (o temporada está vacía), esa edición se
+    manda al final y se desempata por id (la creada más recientemente
+    en el sistema, ya que no hay forma de saber su año)."""
+    anios = re.findall(r"\d{4}", c.temporada or "")
+    anio = int(anios[-1]) if anios else -1
+    return (anio, c.id)
+
+
+@app.get("/competiciones/ediciones", response_model=List[schemas.CompeticionResponse])
+def obtener_ediciones_competicion(nombre: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+    """Todas las ediciones/temporadas ya cargadas para una competición
+    (ej. todas las filas "Copa Libertadores"), con la más reciente
+    primera. Pensado para poblar el selector de edición del frontend
+    apenas el usuario elige/crea una competición."""
+    filas = db.query(models.Competicion).filter(
+        func.lower(models.Competicion.nombre) == nombre.strip().lower()
+    ).all()
+    filas.sort(key=_clave_orden_edicion, reverse=True)
+    return filas
+
+
+@app.put("/competiciones/{competicion_id}", response_model=schemas.CompeticionResponse)
+def actualizar_competicion(competicion_id: int, datos: schemas.CompeticionUpdate, db: Session = Depends(get_db)):
+    competicion = db.query(models.Competicion).filter(models.Competicion.id == competicion_id).first()
+    if not competicion:
+        raise HTTPException(status_code=404, detail="Competición no encontrada")
+
+    nombre_clean = datos.nombre.strip()
+    if not nombre_clean:
+        raise HTTPException(status_code=400, detail="El nombre de la competición no puede estar vacío")
+    # Permite corregir una temporada mal cargada, o directamente vaciarla
+    # (queda en None, que es como si "se ignorara" ese dato de nuevo).
+    temporada_clean = (datos.temporada or "").strip() or None
+
+    duplicado = db.query(models.Competicion).filter(
+        func.lower(models.Competicion.nombre) == nombre_clean.lower(),
+        models.Competicion.temporada == temporada_clean,
+        models.Competicion.id != competicion_id,
+    ).first()
+    if duplicado:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe otra competición con ese nombre y esa edición/temporada",
+        )
+
+    nombre_viejo = competicion.nombre
+    # Los partidos guardan el nombre de la competición como texto plano
+    # (Partido.competicion no es FK). Si acá se corrige el nombre, hay
+    # que propagar el cambio para que esos partidos sigan matcheando
+    # con la competición renombrada (mismo criterio que ya se usa al
+    # renombrar un equipo en un partido editado).
+    if nombre_clean.lower() != nombre_viejo.strip().lower():
+        db.query(models.Partido).filter(
+            func.lower(models.Partido.competicion) == nombre_viejo.strip().lower()
+        ).update({models.Partido.competicion: nombre_clean}, synchronize_session=False)
+
+    competicion.nombre = nombre_clean
+    competicion.temporada = temporada_clean
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Ya existe otra competición con ese nombre y esa edición/temporada")
+    db.refresh(competicion)
+    return competicion
 
 
 @app.delete("/competiciones/{competicion_id}", status_code=204)
@@ -422,6 +519,7 @@ def obtener_partidos(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=500),
     competicion: Optional[str] = None,
+    temporada: Optional[str] = None,
     anio: Optional[int] = None,
     equipo: Optional[str] = None,
     q: Optional[str] = None,
@@ -436,6 +534,8 @@ def obtener_partidos(
     )
     if competicion:
         query = query.filter(func.lower(models.Partido.competicion) == competicion.strip().lower())
+    if temporada:
+        query = query.filter(func.lower(models.Partido.temporada) == temporada.strip().lower())
     if anio:
         query = query.filter(extract("year", models.Partido.fecha_partido) == anio)
     if equipo:
@@ -497,6 +597,7 @@ def crear_partido(partido: schemas.PartidoCreate, db: Session = Depends(get_db))
     datos["equipo_local"] = local
     datos["equipo_visitante"] = visitante
     datos["penales_ganador"] = ganador_penales
+    datos["temporada"] = (partido.temporada or "").strip() or None
     nuevo_partido = models.Partido(**datos)
     db.add(nuevo_partido)
     try:
@@ -547,6 +648,7 @@ def actualizar_partido(partido_id: int, datos: schemas.PartidoUpdate, db: Sessio
     ganador_penales = _validar_penales(local, visitante, datos.penales, datos.penales_ganador)
 
     partido.competicion = datos.competicion
+    partido.temporada = (datos.temporada or "").strip() or None
     partido.equipo_local = local
     partido.equipo_visitante = visitante
     partido.estadio = datos.estadio
@@ -641,13 +743,15 @@ def _ganador_partido(p: "models.Partido") -> Optional[str]:
     return None
 
 
-def _filtrar_por_partido(query, competicion: Optional[str], anio: Optional[int]):
-    """Aplica los filtros opcionales de competición/año sobre un query
-    que ya tiene un JOIN con la tabla partidos."""
+def _filtrar_por_partido(query, competicion: Optional[str], anio: Optional[int], temporada: Optional[str] = None):
+    """Aplica los filtros opcionales de competición/año/edición sobre un
+    query que ya tiene un JOIN con la tabla partidos."""
     if competicion:
         query = query.filter(func.lower(models.Partido.competicion) == competicion.strip().lower())
     if anio:
         query = query.filter(extract("year", models.Partido.fecha_partido) == anio)
+    if temporada:
+        query = query.filter(func.lower(models.Partido.temporada) == temporada.strip().lower())
     return query
 
 

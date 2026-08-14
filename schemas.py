@@ -39,6 +39,11 @@ class CompeticionBase(BaseModel):
 class CompeticionCreate(CompeticionBase):
     pass
 
+# Se usa para editar (PUT) una competición/edición ya cargada: mismos
+# campos que al crear (nombre + temporada opcional).
+class CompeticionUpdate(CompeticionBase):
+    pass
+
 class CompeticionResponse(CompeticionBase):
     id: int
 
@@ -109,6 +114,11 @@ class GolResponse(BaseModel):
 # --- SCHEMAS PARTIDO ---
 class PartidoBase(BaseModel):
     competicion: str
+    # Edición/temporada puntual dentro de esa competición (ej. "2026").
+    # Opcional: partidos viejos, ya cargados antes de este campo, quedan
+    # con temporada=None y se siguen viendo bien (solo no van a filtrar
+    # por edición específica).
+    temporada: Optional[str] = None
     equipo_local: str
     equipo_visitante: str
     estadio: Optional[str] = None

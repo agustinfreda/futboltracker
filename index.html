@@ -312,9 +312,23 @@
                         <label class="block text-xs font-medium text-slate-400">Competición</label>
                         <button type="button" onclick="abrirModalCrearCompeticion()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nueva</button>
                     </div>
-                    <select id="p-competicion-select" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    <select id="p-competicion-select" required onchange="onCambiarCompeticionPartido()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                         <!-- Carga dinámica -->
                     </select>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-medium text-slate-400">Edición / Temporada</label>
+                        <button type="button" onclick="toggleNuevaEdicionPartido()" class="text-[11px] text-emerald-400 hover:underline">＋ Nueva edición</button>
+                    </div>
+                    <select id="p-edicion-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <option value="">Sin edición específica</option>
+                    </select>
+                    <div id="p-nueva-edicion-wrap" class="hidden mt-2 flex gap-2">
+                        <input type="text" id="p-nueva-edicion-input" placeholder="Ej. 2026 o 2025/2026" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <button type="button" onclick="agregarEdicionPartido()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-3 rounded-lg transition-colors">Agregar</button>
+                    </div>
                 </div>
 
                 <!-- Selección de Equipos desde lista pre-existente -->
@@ -453,8 +467,9 @@
                     <input type="text" id="pop-comp-nombre" placeholder="Ej. Liga Profesional" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Año / Temporada (opcional)</label>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Año / Edición (opcional)</label>
                     <input type="text" id="pop-comp-temporada" placeholder="Ej. 2026 o 2025/2026" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    <p class="text-[11px] text-slate-500 mt-1">Si esta competición ya existe con otro nombre, no hace falta crearla de nuevo: elegila del selector y usá "⚙ Gestionar ediciones" para agregarle una edición nueva.</p>
                 </div>
                 <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
                     Guardar Competición
@@ -775,7 +790,76 @@
 
             await cargarCompeticiones();
             document.getElementById('p-competicion-select').value = competicionCreada.nombre;
+            await onCambiarCompeticionPartido(competicionCreada.temporada);
             cerrarModalCrearCompeticion();
+        }
+
+        // --- EDICIÓN/TEMPORADA (dentro del propio formulario de partido) ---
+        // Al elegir una competición, se cargan sus ediciones ya creadas
+        // (más reciente primero) para elegir una, o se puede cargar una
+        // edición nueva ahí mismo sin salir del formulario.
+        let edicionesPartidoMemoria = [];
+
+        async function onCambiarCompeticionPartido(valorAConservar) {
+            const nombre = document.getElementById('p-competicion-select').value;
+            const select = document.getElementById('p-edicion-select');
+            document.getElementById('p-nueva-edicion-wrap').classList.add('hidden');
+            document.getElementById('p-nueva-edicion-input').value = '';
+
+            if (!nombre) {
+                edicionesPartidoMemoria = [];
+                select.innerHTML = `<option value="">Sin edición específica</option>`;
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/competiciones/ediciones?nombre=${encodeURIComponent(nombre)}`);
+                edicionesPartidoMemoria = await res.json();
+            } catch (e) {
+                edicionesPartidoMemoria = [];
+            }
+
+            // Las ediciones con temporada cargada van primero (más reciente
+            // primero, ya vienen así del backend); "Sin edición específica"
+            // queda al final para no taparlas por defecto.
+            const opciones = edicionesPartidoMemoria
+                .filter(c => c.temporada)
+                .map(c => `<option value="${c.temporada}">${c.temporada}</option>`)
+                .join('');
+            select.innerHTML = opciones + `<option value="">Sin edición específica</option>`;
+
+            if (valorAConservar !== undefined) {
+                const valores = edicionesPartidoMemoria.map(c => c.temporada || '');
+                select.value = valores.includes(valorAConservar) ? valorAConservar : '';
+            }
+        }
+
+        function toggleNuevaEdicionPartido() {
+            const nombre = document.getElementById('p-competicion-select').value;
+            if (!nombre) {
+                alert('Elegí primero una competición.');
+                return;
+            }
+            document.getElementById('p-nueva-edicion-wrap').classList.toggle('hidden');
+            document.getElementById('p-nueva-edicion-input').focus();
+        }
+
+        async function agregarEdicionPartido() {
+            const nombre = document.getElementById('p-competicion-select').value;
+            const temporada = document.getElementById('p-nueva-edicion-input').value.trim();
+            if (!nombre || !temporada) return;
+
+            let competicionCreada;
+            try {
+                competicionCreada = await apiRequest(`${API_URL}/competiciones/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, temporada })
+                });
+            } catch (err) { return; }
+
+            await cargarCompeticiones();
+            await onCambiarCompeticionPartido(competicionCreada.temporada);
         }
 
         // --- INSTANCIAS ---
@@ -970,7 +1054,7 @@
                     <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg flex flex-col">
                         <div class="flex justify-between items-start gap-2 mb-3">
                             <div class="min-w-0">
-                                <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}</span>
+                                <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}${p.temporada ? ' ' + p.temporada : ''}</span>
                                 <p class="text-[11px] text-slate-400 mt-1 truncate">${p.instancia} • ${p.fecha_partido}</p>
                             </div>
                             <div class="flex items-center gap-2.5 shrink-0">
@@ -1089,6 +1173,8 @@
         // --- POPUP NUEVO PARTIDO ---
         function abrirModalNuevoPartido() {
             document.getElementById('p-edit-id').value = '';
+            document.getElementById('p-edicion-select').innerHTML = `<option value="">Sin edición específica</option>`;
+            document.getElementById('p-nueva-edicion-wrap').classList.add('hidden');
             document.getElementById('p-penales-check').checked = false;
             togglePenalesGanador();
             document.getElementById('modal-partido-titulo').innerHTML = '<i class="fa-solid fa-plus-circle text-emerald-400 mr-2"></i>Registrar Partido Visto';
@@ -1096,9 +1182,10 @@
             document.getElementById('modal-partido').classList.remove('hidden');
         }
 
-        function abrirModalEditarPartido(partido) {
+        async function abrirModalEditarPartido(partido) {
             document.getElementById('p-edit-id').value = partido.id;
             document.getElementById('p-competicion-select').value = partido.competicion;
+            await onCambiarCompeticionPartido(partido.temporada || '');
             document.getElementById('p-local-select').value = partido.equipo_local;
             document.getElementById('p-visitante-select').value = partido.equipo_visitante;
             document.getElementById('p-estadio-select').value = partido.estadio || '';
@@ -1163,6 +1250,7 @@
 
             const data = {
                 competicion: document.getElementById('p-competicion-select').value,
+                temporada: document.getElementById('p-edicion-select').value || null,
                 equipo_local: local,
                 equipo_visitante: visitante,
                 estadio: document.getElementById('p-estadio-select').value || null,
@@ -1706,7 +1794,7 @@
                 }
 
                 contUltimo.innerHTML = `
-                    <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}</span>
+                    <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}${p.temporada ? ' ' + p.temporada : ''}</span>
                     <p class="text-[11px] text-slate-400 mt-1 mb-3">${p.instancia} • ${p.fecha_partido}</p>
                     <div class="flex items-center justify-between bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
                         <p class="text-sm font-bold text-white text-right w-2/5 leading-tight flex items-center justify-end gap-1.5">
