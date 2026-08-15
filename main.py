@@ -36,7 +36,7 @@ def _asegurar_columna_temporada_partidos():
             conn.execute(text("ALTER TABLE partidos ADD COLUMN temporada VARCHAR(20)"))
 
 
-_asegurar_columna_temporada_partidos()
+#_asegurar_columna_temporada_partidos()
 
 app = FastAPI(title="Futbol Tracker API")
 
