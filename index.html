@@ -344,18 +344,24 @@
                             <label class="block text-xs font-medium text-slate-400">Equipo Local</label>
                             <button type="button" onclick="abrirModalCrearEquipo('local')" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
                         </div>
-                        <select id="p-local-select" required onchange="togglePenalesGanador()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
-                            <!-- Carga dinámica -->
-                        </select>
+                        <div class="relative">
+                            <input type="text" id="p-local-buscar" oninput="filtrarEquipoAuto('local', this.value)" onfocus="abrirListaEquipos('local')" placeholder="Elegí de la lista o escribí para buscar..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <!-- Guarda el nombre del equipo elegido (vacío = sin elegir) -->
+                            <input type="hidden" id="p-local-select">
+                            <div id="desplegable-local" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-56 overflow-y-auto hidden z-20 shadow-2xl"></div>
+                        </div>
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="block text-xs font-medium text-slate-400">Equipo Visitante</label>
                             <button type="button" onclick="abrirModalCrearEquipo('visitante')" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
                         </div>
-                        <select id="p-visitante-select" required onchange="togglePenalesGanador()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
-                            <!-- Carga dinámica -->
-                        </select>
+                        <div class="relative">
+                            <input type="text" id="p-visitante-buscar" oninput="filtrarEquipoAuto('visitante', this.value)" onfocus="abrirListaEquipos('visitante')" placeholder="Elegí de la lista o escribí para buscar..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <!-- Guarda el nombre del equipo elegido (vacío = sin elegir) -->
+                            <input type="hidden" id="p-visitante-select">
+                            <div id="desplegable-visitante" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-56 overflow-y-auto hidden z-20 shadow-2xl"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -749,31 +755,90 @@
             } catch (e) {
                 equiposMemoria = [];
             }
-            poblarSelectsEquipos();
         }
 
-        function poblarSelectsEquipos() {
-            const opciones = equiposMemoria.length > 0
-                ? equiposMemoria.map(e => `<option value="${e.nombre}">${e.nombre}</option>`).join('')
-                : `<option value="">Sin equipos registrados</option>`;
+        // Selector de clubes con lista completa + búsqueda por texto.
+        // Al hacer foco se ve TODA la lista de clubes (con scroll); al
+        // escribir se filtra. El club realmente elegido queda en el input
+        // hidden #p-local-select / #p-visitante-select, que es el que lee el
+        // resto del código. La lista sale de equiposMemoria (ya cargada).
+        const LADOS_EQUIPO = ['local', 'visitante'];
 
-            // Reconstruir el <select> con innerHTML resetea la selección a la
-            // primera opción, así que guardamos el valor actual antes de
-            // pisarlo y lo restauramos después (mismo criterio que en
-            // cargarCompeticiones), para no perder lo ya elegido si esto se
-            // dispara con el formulario de partido todavía abierto.
-            const selectLocal = document.getElementById('p-local-select');
-            const selectVisitante = document.getElementById('p-visitante-select');
-            const valorLocalPrevio = selectLocal.value;
-            const valorVisitantePrevio = selectVisitante.value;
-            const nombresDisponibles = equiposMemoria.map(e => e.nombre);
-
-            selectLocal.innerHTML = opciones;
-            selectVisitante.innerHTML = opciones;
-
-            if (nombresDisponibles.includes(valorLocalPrevio)) selectLocal.value = valorLocalPrevio;
-            if (nombresDisponibles.includes(valorVisitantePrevio)) selectVisitante.value = valorVisitantePrevio;
+        function normalizarTexto(s) {
+            return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         }
+
+        function setEquipoPartido(lado, nombre) {
+            document.getElementById(`p-${lado}-select`).value = nombre || '';
+            document.getElementById(`p-${lado}-buscar`).value = nombre || '';
+            document.getElementById(`desplegable-${lado}`).classList.add('hidden');
+            togglePenalesGanador();
+        }
+
+        // Al hacer foco: si ya hay un club elegido muestra la lista completa;
+        // si hay texto sin elegir, filtra por ese texto.
+        function abrirListaEquipos(lado) {
+            const elegido = document.getElementById(`p-${lado}-select`).value;
+            const texto = document.getElementById(`p-${lado}-buscar`).value;
+            renderListaEquipos(lado, elegido ? '' : texto);
+        }
+
+        // Al escribir: la selección anterior ya no vale y se filtra la lista.
+        function filtrarEquipoAuto(lado, query) {
+            document.getElementById(`p-${lado}-select`).value = '';
+            togglePenalesGanador();
+            renderListaEquipos(lado, query);
+        }
+
+        function renderListaEquipos(lado, query) {
+            const desp = document.getElementById(`desplegable-${lado}`);
+            const q = normalizarTexto(query.trim());
+            const elegido = document.getElementById(`p-${lado}-select`).value;
+            const resultados = equiposMemoria.filter(e => !q || normalizarTexto(e.nombre).includes(q));
+            desp.innerHTML = '';
+
+            if (resultados.length === 0) {
+                const caja = document.createElement('div');
+                caja.className = 'p-3 text-xs text-slate-400 text-center';
+                caja.appendChild(document.createTextNode(
+                    equiposMemoria.length === 0 ? 'Todavía no hay clubes registrados.' : 'No existe este club.'
+                ));
+                if (query.trim()) {
+                    caja.appendChild(document.createElement('br'));
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'mt-2 text-emerald-400 underline font-bold';
+                    btn.textContent = `＋ Crear "${query.trim()}" ahora`;
+                    btn.addEventListener('click', () => {
+                        desp.classList.add('hidden');
+                        abrirModalCrearEquipo(lado, query.trim());
+                    });
+                    caja.appendChild(btn);
+                }
+                desp.appendChild(caja);
+            } else {
+                resultados.forEach(e => {
+                    const fila = document.createElement('div');
+                    fila.className = 'px-3 py-2 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs '
+                        + (e.nombre === elegido ? 'text-emerald-400 font-bold' : 'text-white');
+                    fila.textContent = e.nombre;
+                    fila.addEventListener('click', () => setEquipoPartido(lado, e.nombre));
+                    desp.appendChild(fila);
+                });
+            }
+            desp.classList.remove('hidden');
+        }
+
+        // Cerrar los desplegables de clubes al hacer click fuera.
+        document.addEventListener('click', (ev) => {
+            LADOS_EQUIPO.forEach(lado => {
+                const input = document.getElementById(`p-${lado}-buscar`);
+                const desp = document.getElementById(`desplegable-${lado}`);
+                if (input && desp && ev.target !== input && !desp.contains(ev.target)) {
+                    desp.classList.add('hidden');
+                }
+            });
+        });
 
         // --- ESTADIOS ---
         // Buscador de estadios (mismo esquema que el de jugadores): el input
@@ -1132,8 +1197,11 @@
             cerrarModalCrearInstancia();
         }
 
-        function abrirModalCrearEquipo(target) {
+        function abrirModalCrearEquipo(target, nombreSugerido) {
             campoEquipoTarget = target;
+            if (typeof nombreSugerido === 'string') {
+                document.getElementById('pop-eq-nombre').value = nombreSugerido;
+            }
             document.getElementById('modal-crear-equipo').classList.remove('hidden');
         }
 
@@ -1158,10 +1226,8 @@
 
             await cargarEquipos();
 
-            if (campoEquipoTarget === 'local') {
-                document.getElementById('p-local-select').value = equipoCreado.nombre;
-            } else if (campoEquipoTarget === 'visitante') {
-                document.getElementById('p-visitante-select').value = equipoCreado.nombre;
+            if (LADOS_EQUIPO.includes(campoEquipoTarget)) {
+                setEquipoPartido(campoEquipoTarget, equipoCreado.nombre);
             }
 
             cerrarModalCrearEquipo();
@@ -1401,6 +1467,8 @@
         // --- POPUP NUEVO PARTIDO ---
         function abrirModalNuevoPartido() {
             document.getElementById('p-edit-id').value = '';
+            setEquipoPartido('local', '');
+            setEquipoPartido('visitante', '');
             setEstadioPartido('');
             document.getElementById('p-edicion-select').innerHTML = `<option value="">Sin edición específica</option>`;
             document.getElementById('p-nueva-edicion-wrap').classList.add('hidden');
@@ -1414,8 +1482,8 @@
         async function abrirModalEditarPartido(partido) {
             document.getElementById('p-edit-id').value = partido.id;
             document.getElementById('p-competicion-select').value = partido.competicion;
-            document.getElementById('p-local-select').value = partido.equipo_local;
-            document.getElementById('p-visitante-select').value = partido.equipo_visitante;
+            setEquipoPartido('local', partido.equipo_local);
+            setEquipoPartido('visitante', partido.equipo_visitante);
             setEstadioPartido(partido.estadio || '');
             document.getElementById('p-instancia-select').value = partido.instancia;
             document.getElementById('p-fecha').value = partido.fecha_partido;
@@ -1466,6 +1534,11 @@
             e.preventDefault();
             const local = document.getElementById('p-local-select').value;
             const visitante = document.getElementById('p-visitante-select').value;
+
+            if (!local || !visitante) {
+                alert("Elegí el equipo local y el visitante de la lista (o creá uno nuevo).");
+                return;
+            }
 
             if (local === visitante) {
                 alert("Un equipo no puede jugar contra sí mismo.");
