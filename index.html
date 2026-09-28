@@ -364,10 +364,12 @@
                         <label class="block text-xs font-medium text-slate-400">Estadio</label>
                         <button type="button" onclick="abrirModalCrearEstadio()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
                     </div>
-                    <select id="p-estadio-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
-                        <option value="">Sin especificar</option>
-                        <!-- Carga dinámica -->
-                    </select>
+                    <div class="relative">
+                        <input type="text" id="p-estadio-buscar" oninput="buscarEstadioAuto(this.value)" onfocus="buscarEstadioAuto(this.value)" placeholder="Buscar estadio por nombre (opcional)..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <!-- Guarda el nombre del estadio elegido (vacío = sin especificar) -->
+                        <input type="hidden" id="p-estadio-select">
+                        <div id="desplegable-estadios" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-48 overflow-y-auto hidden z-10 shadow-2xl"></div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -594,6 +596,8 @@
                         <option value="PENAL">Penal</option>
                         <option value="TIRO LIBRE">Tiro Libre</option>
                         <option value="CABEZA">Cabeza</option>
+                        <option value="GOL OLIMPICO">Gol Olímpico</option>
+                        <option value="GOLAZO">GOLAZO</option>
                         <option value="AUTOGOL">Autogol</option>
                     </select>
                 </div>
@@ -696,7 +700,6 @@
         let partidosSkip = 0;
         let partidosHayMas = true;
         let equiposMemoria = [];
-        let estadiosMemoria = [];
         let campoEquipoTarget = null; // Para saber cuál selector actualizar cuando se crea un equipo rápido
 
         // --- HELPER: fetch que revisa errores y muestra el mensaje del backend ---
@@ -773,21 +776,85 @@
         }
 
         // --- ESTADIOS ---
-        async function cargarEstadios() {
-            try {
-                const res = await fetch(`${API_URL}/estadios/`);
-                estadiosMemoria = await res.json();
-            } catch (e) {
-                estadiosMemoria = [];
-            }
-            const opciones = estadiosMemoria.map(e => `<option value="${e.nombre}">${e.nombre}${e.ciudad ? ' — ' + e.ciudad : ''}</option>`).join('');
-            const select = document.getElementById('p-estadio-select');
-            const valorPrevio = select.value;
-            select.innerHTML = `<option value="">Sin especificar</option>` + opciones;
-            if (estadiosMemoria.some(e => e.nombre === valorPrevio)) select.value = valorPrevio;
+        // Buscador de estadios (mismo esquema que el de jugadores): el input
+        // visible es solo para escribir; el estadio realmente elegido queda
+        // en #p-estadio-select (hidden), que es el que lee el resto del código.
+        function setEstadioPartido(nombre) {
+            document.getElementById('p-estadio-select').value = nombre || '';
+            document.getElementById('p-estadio-buscar').value = nombre || '';
+            document.getElementById('desplegable-estadios').classList.add('hidden');
         }
 
-        function abrirModalCrearEstadio() {
+        let buscarEstadioTimeout = null;
+        function buscarEstadioAuto(query) {
+            // Si el usuario edita el texto, la selección anterior ya no vale.
+            document.getElementById('p-estadio-select').value = '';
+            clearTimeout(buscarEstadioTimeout);
+            buscarEstadioTimeout = setTimeout(() => mostrarResultadosEstadio(query), 200);
+        }
+
+        async function mostrarResultadosEstadio(query) {
+            const desp = document.getElementById('desplegable-estadios');
+            let resultados = [];
+            try {
+                const res = await fetch(`${API_URL}/estadios/buscar/?nombre=${encodeURIComponent(query.trim())}`);
+                if (!res.ok) throw new Error();
+                resultados = await res.json();
+            } catch (e) {
+                desp.classList.add('hidden');
+                return;
+            }
+            desp.innerHTML = '';
+
+            if (resultados.length === 0) {
+                const caja = document.createElement('div');
+                caja.className = 'p-3 text-xs text-slate-400 text-center';
+                caja.appendChild(document.createTextNode('No existe este estadio.'));
+                if (query.trim()) {
+                    caja.appendChild(document.createElement('br'));
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'mt-2 text-emerald-400 underline font-bold';
+                    btn.textContent = `＋ Crear "${query.trim()}" ahora`;
+                    btn.addEventListener('click', () => {
+                        desp.classList.add('hidden');
+                        abrirModalCrearEstadio(query.trim());
+                    });
+                    caja.appendChild(btn);
+                }
+                desp.appendChild(caja);
+            } else {
+                resultados.forEach(e => {
+                    const fila = document.createElement('div');
+                    fila.className = 'p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs';
+                    const t = document.createElement('p');
+                    t.className = 'font-bold text-white';
+                    t.textContent = e.nombre;
+                    const c = document.createElement('p');
+                    c.className = 'text-slate-400';
+                    c.textContent = e.ciudad || 'Ciudad sin especificar';
+                    fila.appendChild(t);
+                    fila.appendChild(c);
+                    fila.addEventListener('click', () => setEstadioPartido(e.nombre));
+                    desp.appendChild(fila);
+                });
+            }
+            desp.classList.remove('hidden');
+        }
+
+        // Cerrar el desplegable al hacer click fuera del buscador.
+        document.addEventListener('click', (ev) => {
+            const input = document.getElementById('p-estadio-buscar');
+            const desp = document.getElementById('desplegable-estadios');
+            if (input && desp && ev.target !== input && !desp.contains(ev.target)) {
+                desp.classList.add('hidden');
+            }
+        });
+
+        function abrirModalCrearEstadio(nombreSugerido) {
+            if (typeof nombreSugerido === 'string') {
+                document.getElementById('pop-est-nombre').value = nombreSugerido;
+            }
             document.getElementById('modal-crear-estadio').classList.remove('hidden');
         }
 
@@ -812,8 +879,7 @@
                 });
             } catch (err) { return; }
 
-            await cargarEstadios();
-            document.getElementById('p-estadio-select').value = estadioCreado.nombre;
+            setEstadioPartido(estadioCreado.nombre);
             cerrarModalCrearEstadio();
         }
 
@@ -1109,7 +1175,6 @@
         // un filtro (texto, competición, año o equipo).
         async function cargarPartidos() {
             await cargarEquipos();
-            await cargarEstadios();
             await cargarCompeticiones();
             await cargarInstancias();
             if (anioOpcionesCache.length === 0) {
@@ -1336,6 +1401,7 @@
         // --- POPUP NUEVO PARTIDO ---
         function abrirModalNuevoPartido() {
             document.getElementById('p-edit-id').value = '';
+            setEstadioPartido('');
             document.getElementById('p-edicion-select').innerHTML = `<option value="">Sin edición específica</option>`;
             document.getElementById('p-nueva-edicion-wrap').classList.add('hidden');
             document.getElementById('p-penales-check').checked = false;
@@ -1350,7 +1416,7 @@
             document.getElementById('p-competicion-select').value = partido.competicion;
             document.getElementById('p-local-select').value = partido.equipo_local;
             document.getElementById('p-visitante-select').value = partido.equipo_visitante;
-            document.getElementById('p-estadio-select').value = partido.estadio || '';
+            setEstadioPartido(partido.estadio || '');
             document.getElementById('p-instancia-select').value = partido.instancia;
             document.getElementById('p-fecha').value = partido.fecha_partido;
             document.getElementById('p-penales-check').checked = !!partido.penales;
@@ -1411,6 +1477,11 @@
 
             if (penales && !penalesGanador) {
                 alert("Indicá qué equipo ganó en penales.");
+                return;
+            }
+
+            if (document.getElementById('p-estadio-buscar').value.trim() && !document.getElementById('p-estadio-select').value) {
+                alert("Elegí un estadio de la lista, creá uno nuevo o dejá el campo vacío.");
                 return;
             }
 

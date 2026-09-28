@@ -124,6 +124,18 @@ def obtener_estadios(db: Session = Depends(get_db)):
     return db.query(models.Estadio).order_by(models.Estadio.nombre).all()
 
 
+@app.get("/estadios/buscar/", response_model=List[schemas.EstadioResponse])
+def buscar_estadios(nombre: str = Query("", max_length=150), db: Session = Depends(get_db)):
+    """Búsqueda por nombre (parcial, sin distinguir mayúsculas) sobre los
+    estadios ya creados. Con el texto vacío devuelve los primeros por
+    orden alfabético, así el desplegable muestra opciones al hacer foco."""
+    query = db.query(models.Estadio)
+    texto = nombre.strip()
+    if texto:
+        query = query.filter(models.Estadio.nombre.ilike(f"%{texto}%"))
+    return query.order_by(models.Estadio.nombre).limit(10).all()
+
+
 @app.post("/estadios/", response_model=schemas.EstadioResponse)
 def crear_estadio(estadio: schemas.EstadioCreate, db: Session = Depends(get_db)):
     nombre_clean = estadio.nombre.strip()
