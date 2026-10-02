@@ -1,5 +1,9 @@
+import csv
+import io
 import os
 import re
+from collections import Counter, defaultdict
+from datetime import date
 from typing import List, Optional
 
 import models
@@ -7,7 +11,7 @@ import schemas
 from database import engine, get_db
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import extract, func, inspect, text
 from sqlalchemy.exc import IntegrityError
@@ -397,28 +401,69 @@ def _serializar_jugador(jugador: models.Jugador, db: Session) -> dict:
     return _serializar_jugadores([jugador], db)[0]
 
 
-@app.get("/jugadores/", response_model=List[schemas.JugadorResponse])
+def _query_jugadores(db, equipo, q, posicion, nacionalidad, solo_con_goles):
+    """Jugadores + cantidad de goles (calculada, no se guarda en la BD)."""
+    goles_sq = (
+        db.query(models.Gol.jugador_id.label("jid"), func.count(models.Gol.id).label("n"))
+        .group_by(models.Gol.jugador_id).subquery()
+    )
+    goles_col = func.coalesce(goles_sq.c.n, 0)
+    query = db.query(models.Jugador, goles_col.label("goles")).outerjoin(goles_sq, goles_sq.c.jid == models.Jugador.id)
+    if equipo:
+        query = query.filter(models.Jugador.id.in_(
+            db.query(models.Gol.jugador_id).filter(func.lower(models.Gol.equipo) == equipo.strip().lower())
+        ))
+    if q:
+        query = query.filter(models.Jugador.nombre.ilike(f"%{q.strip()}%"))
+    if posicion:
+        query = query.filter(func.lower(models.Jugador.posicion) == posicion.strip().lower())
+    if nacionalidad:
+        query = query.filter(func.lower(models.Jugador.nacionalidad) == nacionalidad.strip().lower())
+    if solo_con_goles:
+        query = query.filter(goles_col > 0)
+    return query, goles_col
+
+
+@app.get("/jugadores/")
 def obtener_jugadores(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=500),
     equipo: Optional[str] = None,
     q: Optional[str] = None,
+    posicion: Optional[str] = None,
+    nacionalidad: Optional[str] = None,
+    solo_con_goles: bool = False,
+    orden: str = Query("nombre", pattern="^(nombre|goles|edad)$"),
     db: Session = Depends(get_db),
 ):
-    query = db.query(models.Jugador)
-    if equipo:
-        # Jugadores que anotaron al menos un gol para ese equipo.
-        query = query.filter(
-            models.Jugador.id.in_(
-                db.query(models.Gol.jugador_id).filter(
-                    func.lower(models.Gol.equipo) == equipo.strip().lower()
-                )
-            )
-        )
-    if q:
-        query = query.filter(models.Jugador.nombre.ilike(f"%{q.strip()}%"))
-    jugadores = query.order_by(models.Jugador.nombre).offset(skip).limit(limit).all()
-    return _serializar_jugadores(jugadores, db)
+    query, goles_col = _query_jugadores(db, equipo, q, posicion, nacionalidad, solo_con_goles)
+    if orden == "goles":
+        query = query.order_by(goles_col.desc(), models.Jugador.nombre)
+    elif orden == "edad":
+        query = query.order_by(func.coalesce(models.Jugador.edad, 0).desc(), models.Jugador.nombre)
+    else:
+        query = query.order_by(models.Jugador.nombre)
+    filas = query.offset(skip).limit(limit).all()
+    datos = _serializar_jugadores([f[0] for f in filas], db)
+    for d, f in zip(datos, filas):
+        d["goles"] = int(f[1])
+    return datos
+
+
+@app.get("/jugadores/conteo")
+def conteo_jugadores(
+    equipo: Optional[str] = None, q: Optional[str] = None, posicion: Optional[str] = None,
+    nacionalidad: Optional[str] = None, solo_con_goles: bool = False, db: Session = Depends(get_db),
+):
+    query, _ = _query_jugadores(db, equipo, q, posicion, nacionalidad, solo_con_goles)
+    return {"total": query.count()}
+
+
+@app.get("/jugadores/filtros")
+def opciones_filtros_jugadores(db: Session = Depends(get_db)):
+    def distintos(col):
+        return sorted(r[0] for r in db.query(col).filter(col.isnot(None), col != "").distinct().all())
+    return {"posiciones": distintos(models.Jugador.posicion), "nacionalidades": distintos(models.Jugador.nacionalidad)}
 
 
 @app.get("/jugadores/buscar/", response_model=List[schemas.JugadorResponse])
@@ -526,6 +571,37 @@ def _validar_penales(local: str, visitante: str, penales: bool, penales_ganador:
     )
 
 
+def _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales):
+    low = lambda c, v: func.lower(c) == v.strip().lower()
+    if competicion:
+        query = query.filter(low(models.Partido.competicion, competicion))
+    if temporada:
+        query = query.filter(low(models.Partido.temporada, temporada))
+    if anio:
+        query = query.filter(extract("year", models.Partido.fecha_partido) == anio)
+    if instancia:
+        query = query.filter(low(models.Partido.instancia, instancia))
+    if estadio:
+        query = query.filter(low(models.Partido.estadio, estadio))
+    if desde:
+        query = query.filter(models.Partido.fecha_partido >= desde)
+    if hasta:
+        query = query.filter(models.Partido.fecha_partido <= hasta)
+    if penales:
+        query = query.filter(models.Partido.penales.is_(True))
+    if equipo:
+        query = query.filter(low(models.Partido.equipo_local, equipo) | low(models.Partido.equipo_visitante, equipo))
+    if q:
+        patron = f"%{q.strip().lower()}%"
+        query = query.filter(
+            func.lower(models.Partido.equipo_local).like(patron)
+            | func.lower(models.Partido.equipo_visitante).like(patron)
+            | func.lower(models.Partido.competicion).like(patron)
+            | func.lower(func.coalesce(models.Partido.estadio, "")).like(patron)
+        )
+    return query
+
+
 @app.get("/partidos/", response_model=List[schemas.PartidoResponse])
 def obtener_partidos(
     skip: int = Query(0, ge=0),
@@ -535,39 +611,32 @@ def obtener_partidos(
     anio: Optional[int] = None,
     equipo: Optional[str] = None,
     q: Optional[str] = None,
+    instancia: Optional[str] = None,
+    estadio: Optional[str] = None,
+    desde: Optional[date] = None,
+    hasta: Optional[date] = None,
+    penales: bool = False,
+    orden: str = Query("reciente", pattern="^(reciente|antiguo)$"),
     db: Session = Depends(get_db),
 ):
-    # Filtros server-side: antes el frontend traía TODOS los partidos y
-    # filtraba en JS con partidosMemoria.filter(...). Para poder paginar
-    # de a 20 con un botón "Cargar más", el filtrado tiene que pasar acá,
-    # si no cada página de 20 solo filtraría dentro de esos 20.
     query = db.query(models.Partido).options(
         selectinload(models.Partido.goles).selectinload(models.Gol.jugador)
     )
-    if competicion:
-        query = query.filter(func.lower(models.Partido.competicion) == competicion.strip().lower())
-    if temporada:
-        query = query.filter(func.lower(models.Partido.temporada) == temporada.strip().lower())
-    if anio:
-        query = query.filter(extract("year", models.Partido.fecha_partido) == anio)
-    if equipo:
-        query = query.filter(
-            (func.lower(models.Partido.equipo_local) == equipo.strip().lower())
-            | (func.lower(models.Partido.equipo_visitante) == equipo.strip().lower())
-        )
-    if q:
-        patron = f"%{q.strip().lower()}%"
-        query = query.filter(
-            func.lower(models.Partido.equipo_local).like(patron)
-            | func.lower(models.Partido.equipo_visitante).like(patron)
-            | func.lower(models.Partido.competicion).like(patron)
-        )
-    return (
-        query.order_by(models.Partido.fecha_partido.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    query = _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales)
+    fecha = models.Partido.fecha_partido
+    orden_cols = (fecha.desc(), models.Partido.id.desc()) if orden == "reciente" else (fecha.asc(), models.Partido.id.asc())
+    return query.order_by(*orden_cols).offset(skip).limit(limit).all()
+
+
+@app.get("/partidos/conteo")
+def conteo_partidos(
+    competicion: Optional[str] = None, temporada: Optional[str] = None, anio: Optional[int] = None,
+    equipo: Optional[str] = None, q: Optional[str] = None, instancia: Optional[str] = None,
+    estadio: Optional[str] = None, desde: Optional[date] = None, hasta: Optional[date] = None,
+    penales: bool = False, db: Session = Depends(get_db),
+):
+    query = _filtrar_partidos(db.query(models.Partido), competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales)
+    return {"total": query.count()}
 
 
 @app.get("/partidos/anios-disponibles")
@@ -969,4 +1038,266 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         total_equipos=total_equipos,
         ultimo_partido=ultimo_partido,
         top_goleadores=top_goleadores,
+    )
+
+
+# ==========================================================
+# EXPORTAR CSV + PANEL / ESTADÍSTICAS AVANZADAS
+# Solo lectura: no tocan models.py, schemas.py ni la estructura de la BD.
+# ==========================================================
+BUCKETS_MINUTO = [
+    ("1-15", 1, 15), ("16-30", 16, 30), ("31-45+", 31, 45), ("46-60", 46, 60),
+    ("61-75", 61, 75), ("76-90+", 76, 90), ("Prórroga", 91, 150),
+]
+
+
+def _tramo_minuto(minuto: str) -> Optional[str]:
+    """'45'+2' -> '31-45+', '90+3' -> '76-90+', '105' -> 'Prórroga'."""
+    m = re.match(r"\s*(\d{1,3})", minuto or "")
+    if not m:
+        return None
+    base = int(m.group(1))
+    for nombre, a, b in BUCKETS_MINUTO:
+        if a <= base <= b:
+            return nombre
+    return None
+
+
+def _marcador(p: "models.Partido"):
+    l, v = p.equipo_local.strip().lower(), p.equipo_visitante.strip().lower()
+    return (
+        sum(1 for g in p.goles if g.equipo.strip().lower() == l),
+        sum(1 for g in p.goles if g.equipo.strip().lower() == v),
+    )
+
+
+def _cargar_partidos(db: Session, competicion: Optional[str] = None, anio: Optional[int] = None):
+    q = db.query(models.Partido).options(
+        selectinload(models.Partido.goles).selectinload(models.Gol.jugador)
+    )
+    q = _filtrar_por_partido(q, competicion, anio)
+    return q.order_by(models.Partido.fecha_partido.desc(), models.Partido.id.desc()).all()
+
+
+def _top(counter: Counter, k: int):
+    return [{"nombre": n, "valor": v} for n, v in counter.most_common(k)]
+
+
+def _metricas(partidos):
+    resultados = {"local": 0, "empate": 0, "visitante": 0}
+    goleadores, nac, pos, comp_n, comp_g, vistos, tramos = (Counter() for _ in range(7))
+    nombres = {}
+    tabla = defaultdict(lambda: {"pj": 0, "g": 0, "e": 0, "p": 0, "gf": 0, "gc": 0})
+    meses = defaultdict(lambda: [0, 0])
+    con_gol, dias, instancias = Counter(), Counter(), Counter()
+    total_goles = sin_goles = con_penales = hat = dob = 0
+    mas_goles = goleada = mejor = None
+
+    for p in partidos:
+        gl, gv = _marcador(p)
+        n_goles = len(p.goles)
+        total_goles += n_goles
+        sin_goles += n_goles == 0
+        con_penales += bool(p.penales)
+        etiqueta = f"{p.equipo_local} {gl}-{gv} {p.equipo_visitante}"
+        if n_goles and (mas_goles is None or n_goles > mas_goles["goles"]):
+            mas_goles = {"partido": etiqueta, "goles": n_goles}
+        if gl != gv and (goleada is None or abs(gl - gv) > goleada["diferencia"]):
+            goleada = {"partido": etiqueta, "diferencia": abs(gl - gv)}
+
+        dias[p.fecha_partido.weekday()] += 1
+        instancias[p.instancia] += 1
+
+        ganador = _ganador_partido(p)  # 'local' | 'visitante' | None (penales incluidos)
+        resultados[ganador or "empate"] += 1
+
+        comp_n[p.competicion] += 1
+        comp_g[p.competicion] += n_goles
+        loc, vis = p.equipo_local, p.equipo_visitante
+        for eq, f, c in ((loc, gl, gv), (vis, gv, gl)):
+            vistos[eq] += 1
+            t = tabla[eq]
+            t["pj"] += 1
+            t["gf"] += f
+            t["gc"] += c
+        if ganador == "local":
+            tabla[loc]["g"] += 1
+            tabla[vis]["p"] += 1
+        elif ganador == "visitante":
+            tabla[vis]["g"] += 1
+            tabla[loc]["p"] += 1
+        else:
+            tabla[loc]["e"] += 1
+            tabla[vis]["e"] += 1
+
+        for jid, c in Counter(g.jugador_id for g in p.goles).items():
+            goleadores[jid] += c
+            con_gol[jid] += 1
+            if c >= 3:
+                hat += 1
+            elif c == 2:
+                dob += 1
+            if c >= 2 and (mejor is None or c > mejor["goles"]):
+                mejor = {"jid": jid, "goles": c, "partido": etiqueta}
+        for g in p.goles:
+            nombres[g.jugador_id] = g.jugador.nombre
+            nac[g.jugador.nacionalidad or "Sin dato"] += 1
+            pos[g.jugador.posicion or "Sin dato"] += 1
+            tramos[_tramo_minuto(g.minuto)] += 1
+
+        k = f"{p.fecha_partido.year}-{p.fecha_partido.month:02d}"
+        meses[k][0] += 1
+        meses[k][1] += len(p.goles)
+
+    if mejor:
+        mejor = {"nombre": nombres.get(mejor.pop("jid")), **mejor}
+
+    hoy = date.today()
+    y, mth, claves = hoy.year, hoy.month, []
+    for _ in range(12):
+        claves.append(f"{y}-{mth:02d}")
+        mth -= 1
+        if mth == 0:
+            mth, y = 12, y - 1
+    por_mes = [{"mes": k, "partidos": meses[k][0], "goles": meses[k][1]} for k in reversed(claves)]
+
+    equipos = sorted(
+        tabla.items(),
+        key=lambda kv: (kv[1]["g"], kv[1]["gf"] - kv[1]["gc"], kv[1]["gf"]),
+        reverse=True,
+    )  # todos los equipos: el frontend los reordena según la columna elegida
+    comp_prom = sorted(
+        ({"nombre": c, "valor": round(comp_g[c] / n, 2), "partidos": n} for c, n in comp_n.items() if n >= 2),
+        key=lambda x: x["valor"], reverse=True,
+    )[:5]
+    n = len(partidos)
+
+    nombres_dias = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+
+    return {
+        "total_partidos": n,
+        "total_goles": total_goles,
+        "promedio_goles": round(total_goles / n, 2) if n else 0,
+        "sin_goles": sin_goles,
+        "definidos_penales": con_penales,
+        "hat_tricks": hat,
+        "dobletes": dob,
+        "resultados": resultados,
+        "equipos_distintos": len(vistos),
+        "goleadores_distintos": len(goleadores),
+        "top_goleadores": _top(Counter({nombres[j]: c for j, c in goleadores.items()}), 5),
+        "top_competiciones": _top(comp_n, 5),
+        "top_equipos_vistos": _top(vistos, 5),
+        "competiciones_goleadoras": comp_prom,
+        "goles_por_nacionalidad": _top(nac, 6),
+        "goles_por_posicion": _top(pos, 6),
+        "goles_por_minuto": [{"etiqueta": nm, "valor": tramos[nm]} for nm, _, _ in BUCKETS_MINUTO],
+        "goles_por_tiempo": {
+            "primero": sum(tramos[x] for x in ("1-15", "16-30", "31-45+")),
+            "segundo": sum(tramos[x] for x in ("46-60", "61-75", "76-90+")),
+            "prorroga": tramos["Prórroga"],
+        },
+        "tabla_equipos": [
+            {"nombre": e, **t, "dg": t["gf"] - t["gc"], "efectividad": round((3 * t["g"] + t["e"]) / (3 * t["pj"]) * 100)}
+            for e, t in equipos
+        ],
+        "partidos_con_gol": _top(Counter({nombres[j]: c for j, c in con_gol.items()}), 6),
+        "por_dia_semana": [{"etiqueta": nombres_dias[i], "valor": dias[i]} for i in range(7)],
+        "partidos_por_instancia": _top(instancias, 6),
+        "records": {"mas_goles": mas_goles, "goleada": goleada, "mejor_actuacion": mejor},
+        "por_mes": por_mes,
+    }
+
+
+@app.get("/dashboard/panel")
+def panel_dashboard(db: Session = Depends(get_db)):
+    partidos = _cargar_partidos(db)
+    data = _metricas(partidos)
+    hoy = date.today()
+    data["partidos_anio"] = sum(1 for p in partidos if p.fecha_partido.year == hoy.year)
+    data["anio_actual"] = hoy.year
+    data["ultimo_partido"] = (
+        schemas.PartidoResponse.model_validate(partidos[0]).model_dump(mode="json") if partidos else None
+    )
+    data["ultimos_partidos"] = [
+        {
+            "id": p.id, "fecha": str(p.fecha_partido), "competicion": p.competicion,
+            "temporada": p.temporada, "instancia": p.instancia,
+            "local": p.equipo_local, "visitante": p.equipo_visitante,
+            "gl": _marcador(p)[0], "gv": _marcador(p)[1],
+        }
+        for p in partidos[:5]
+    ]
+    return data
+
+
+@app.get("/estadisticas/avanzadas")
+def estadisticas_avanzadas(
+    competicion: Optional[str] = None, anio: Optional[int] = None, db: Session = Depends(get_db)
+):
+    return _metricas(_cargar_partidos(db, competicion, anio))
+
+
+def _csv_response(nombre: str, columnas: list, filas: list) -> Response:
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(columnas)
+    w.writerows(filas)
+    # BOM utf-8 para que Excel respete tildes y ñ.
+    return Response(
+        content="\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}_{date.today().isoformat()}.csv"'},
+    )
+
+
+@app.get("/exportar/csv")
+def exportar_csv(tipo: str = Query("completo", pattern="^(completo|partidos|jugadores)$"), db: Session = Depends(get_db)):
+    if tipo == "jugadores":
+        jugadores = db.query(models.Jugador).order_by(models.Jugador.nombre).all()
+        equipos = _mapa_equipos_por_jugador([j.id for j in jugadores], db)
+        goles = dict(db.query(models.Gol.jugador_id, func.count(models.Gol.id)).group_by(models.Gol.jugador_id).all())
+        filas = [
+            [j.id, j.nombre, j.nacionalidad or "", j.posicion or "", j.edad or "",
+             " / ".join(equipos.get(j.id, [])), goles.get(j.id, 0)]
+            for j in jugadores
+        ]
+        return _csv_response(
+            "jugadores", ["id", "nombre", "nacionalidad", "posicion", "edad", "equipos", "goles_totales"], filas
+        )
+
+    partidos = list(reversed(_cargar_partidos(db)))  # cronológico
+    if tipo == "partidos":
+        filas = []
+        for p in partidos:
+            gl, gv = _marcador(p)
+            filas.append([
+                p.id, p.fecha_partido, p.competicion, p.temporada or "", p.instancia,
+                p.equipo_local, gl, gv, p.equipo_visitante, p.estadio or "",
+                "SI" if p.penales else "NO", p.penales_ganador or "",
+            ])
+        return _csv_response(
+            "partidos",
+            ["id", "fecha", "competicion", "temporada", "instancia", "local", "goles_local",
+             "goles_visitante", "visitante", "estadio", "definido_por_penales", "ganador_penales"],
+            filas,
+        )
+
+    # completo: una fila por gol; los partidos sin goles salen igual (columnas de gol vacías).
+    filas = []
+    for p in partidos:
+        gl, gv = _marcador(p)
+        base = [p.id, p.fecha_partido, p.competicion, p.temporada or "", p.instancia,
+                p.equipo_local, p.equipo_visitante, f"{gl}-{gv}", p.estadio or "", p.penales_ganador or ""]
+        if not p.goles:
+            filas.append(base + ["", "", "", "", "", ""])
+        for g in p.goles:
+            filas.append(base + [g.minuto, g.equipo, g.jugador.nombre, g.tipo,
+                                 g.jugador.nacionalidad or "", g.jugador.posicion or ""])
+    return _csv_response(
+        "futbol_tracker_completo",
+        ["partido_id", "fecha", "competicion", "temporada", "instancia", "local", "visitante", "marcador",
+         "estadio", "ganador_penales", "gol_minuto", "gol_equipo", "gol_jugador", "gol_tipo",
+         "jugador_nacionalidad", "jugador_posicion"],
+        filas,
     )
