@@ -75,6 +75,9 @@
                         <button onclick="exportarCSV('completo')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700"><p class="text-sm text-ink font-medium">Partidos y goles</p><p class="text-[11px] text-slate-400">Una fila por gol, con los datos del partido</p></button>
                         <button onclick="exportarCSV('partidos')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700"><p class="text-sm text-ink font-medium">Resumen de partidos</p><p class="text-[11px] text-slate-400">Una fila por partido, con marcador</p></button>
                         <button onclick="exportarCSV('jugadores')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700"><p class="text-sm text-ink font-medium">Jugadores</p><p class="text-[11px] text-slate-400">Datos, clubes y goles totales</p></button>
+                        <div class="border-t border-slate-700 my-1"></div>
+                        <button onclick="document.getElementById('input-importar-fechas').click()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700"><p class="text-sm text-ink font-medium">Importar fechas de nacimiento</p><p class="text-[11px] text-slate-400">CSV con columnas nombre y fecha_nacimiento</p></button>
+                        <input type="file" id="input-importar-fechas" accept=".csv,text/csv" class="hidden" onchange="importarFechasCSV(this)">
                     </div>
                 </div>
                 <button onclick="alternarTema()" class="btn-ghost !px-3" id="btn-tema" title="Cambiar entre tema claro y oscuro" aria-label="Cambiar tema"><i id="theme-icon" class="fa-solid fa-sun"></i></button>
@@ -126,7 +129,7 @@
             </div>
             <div id="wrap-form-jugador" class="card hidden">
                 <form id="form-jugador" onsubmit="guardarJugador(event)" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <div><label class="block text-xs font-medium text-slate-400 mb-1">Nombre completo</label><input type="text" id="j-nombre" placeholder="Ej. Edinson Cavani" required class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label><input type="text" id="j-nacionalidad" placeholder="Ej. Uruguaya"  class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Posición</label><input type="text" id="j-posicion" placeholder="Ej. Delantero"  class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Edad</label><input type="number" id="j-edad" placeholder="Ej. 37"  class="fld !py-2 !text-sm"></div>
+                    <div><label class="block text-xs font-medium text-slate-400 mb-1">Nombre completo</label><input type="text" id="j-nombre" placeholder="Ej. Edinson Cavani" required class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label><input type="text" id="j-nacionalidad" placeholder="Ej. Uruguaya"  class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Posición</label><input type="text" id="j-posicion" placeholder="Ej. Delantero"  class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Fecha de nacimiento</label><input type="date" id="j-fecha-nac" class="fld !py-2 !text-sm"></div>
                     <button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">Guardar jugador</button>
                 </form>
             </div>
@@ -545,8 +548,8 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Edad</label>
-                        <input type="number" id="pop-j-edad" placeholder="Ej. 25" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Fecha de nacimiento</label>
+                        <input type="date" id="pop-j-fecha-nac" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label>
@@ -585,8 +588,10 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Edad</label>
-                        <input type="number" id="edit-j-edad" placeholder="Ej. 25" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Fecha de nacimiento</label>
+                        <input type="date" id="edit-j-fecha-nac" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                        <input type="hidden" id="edit-j-edad">
+                        <p id="edit-j-edad-hint" class="text-[11px] text-slate-500 mt-1"></p>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label>
@@ -1699,7 +1704,7 @@
                     <td class="px-4 py-3"><div class="flex items-center gap-3"><span class="w-9 h-9 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 font-display font-bold flex items-center justify-center shrink-0">${esc(ini)}</span><span class="font-semibold text-ink">${esc(j.nombre)}</span></div></td>
                     <td class="px-4 py-3">${j.posicion ? `<span class="text-xs bg-slate-900 border border-slate-700 rounded-md px-2 py-0.5">${esc(j.posicion)}</span>` : '-'}</td>
                     <td class="px-4 py-3">${esc(j.nacionalidad || '-')}</td>
-                    <td class="px-4 py-3 tabular-nums">${j.edad ? j.edad + ' años' : '-'}</td>
+                    <td class="px-4 py-3 tabular-nums">${j.edad != null ? '<span title="' + (j.fecha_nacimiento ? 'Nació el ' + j.fecha_nacimiento.split('-').reverse().join('/') : 'Edad aproximada: falta cargar la fecha de nacimiento') + '">' + (j.edad_aproximada ? '~' : '') + j.edad + ' años</span>' : '-'}</td>
                     <td class="px-4 py-3">${clubes}</td>
                     <td class="px-4 py-3 text-right"><span class="font-display text-2xl font-bold tabular-nums ${j.goles ? 'text-ink' : 'text-slate-500'}">${j.goles || 0}</span></td>
                     <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
@@ -1734,7 +1739,7 @@
         async function guardarJugador(e) {
             e.preventDefault();
             const val = id => document.getElementById(id).value;
-            const data = { nombre: val('j-nombre'), nacionalidad: val('j-nacionalidad') || null, posicion: val('j-posicion') || null, edad: val('j-edad') ? parseInt(val('j-edad')) : null };
+            const data = { nombre: val('j-nombre'), nacionalidad: val('j-nacionalidad') || null, posicion: val('j-posicion') || null, fecha_nacimiento: val('j-fecha-nac') || null };
             try {
                 await apiRequest(`${API_URL}/jugadores/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             } catch (err) { return; }
@@ -1816,7 +1821,7 @@
             e.preventDefault();
             const data = {
                 nombre: document.getElementById('pop-j-nombre').value,
-                edad: document.getElementById('pop-j-edad').value ? parseInt(document.getElementById('pop-j-edad').value) : null,
+                fecha_nacimiento: document.getElementById('pop-j-fecha-nac').value || null,
                 nacionalidad: document.getElementById('pop-j-nacionalidad').value || null,
                 posicion: document.getElementById('pop-j-posicion').value || null
             };
@@ -1838,7 +1843,12 @@
         function abrirModalEditarJugador(jugador) {
             document.getElementById('edit-j-id').value = jugador.id;
             document.getElementById('edit-j-nombre').value = jugador.nombre;
-            document.getElementById('edit-j-edad').value = jugador.edad || '';
+            document.getElementById('edit-j-fecha-nac').value = jugador.fecha_nacimiento || '';
+            // Edad vieja (solo respaldo si todavía no hay fecha de nacimiento)
+            document.getElementById('edit-j-edad').value = jugador.fecha_nacimiento ? '' : (jugador.edad ?? '');
+            document.getElementById('edit-j-edad-hint').textContent = (!jugador.fecha_nacimiento && jugador.edad != null)
+                ? `Edad cargada antes: ${jugador.edad} años (aproximada). Poné la fecha de nacimiento y se actualiza sola.`
+                : '';
             document.getElementById('edit-j-nacionalidad').value = jugador.nacionalidad || '';
             document.getElementById('edit-j-posicion').value = jugador.posicion || '';
             document.getElementById('modal-editar-jugador').classList.remove('hidden');
@@ -1853,6 +1863,7 @@
             const id = document.getElementById('edit-j-id').value;
             const data = {
                 nombre: document.getElementById('edit-j-nombre').value,
+                fecha_nacimiento: document.getElementById('edit-j-fecha-nac').value || null,
                 edad: document.getElementById('edit-j-edad').value ? parseInt(document.getElementById('edit-j-edad').value) : null,
                 nacionalidad: document.getElementById('edit-j-nacionalidad').value || null,
                 posicion: document.getElementById('edit-j-posicion').value || null
@@ -1910,6 +1921,26 @@
         function exportarCSV(tipo) {
             document.getElementById('export-menu').classList.add('hidden');
             window.location.href = `${API_URL}/exportar/csv?tipo=${tipo}`;
+        }
+        async function importarFechasCSV(input) {
+            const archivo = input.files[0];
+            input.value = '';
+            if (!archivo) return;
+            document.getElementById('export-menu').classList.add('hidden');
+            const texto = await archivo.text();
+            let r;
+            try {
+                r = await apiRequest(`${API_URL}/jugadores/importar-fechas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ csv_texto: texto })
+                });
+            } catch (err) { return; }
+            let msg = `Fechas actualizadas: ${r.actualizados}`;
+            if (r.no_encontrados.length) msg += `\n\nNo se encontró el jugador (${r.no_encontrados.length}):\n- ` + r.no_encontrados.join('\n- ');
+            if (r.invalidos.length) msg += `\n\nFecha inválida (${r.invalidos.length}):\n- ` + r.invalidos.join('\n- ');
+            alert(msg);
+            if (typeof cargarJugadores === 'function') cargarJugadores();
         }
         document.addEventListener('click', ev => {
             if (!document.getElementById('export-wrap').contains(ev.target)) document.getElementById('export-menu').classList.add('hidden');

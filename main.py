@@ -3,7 +3,7 @@ import io
 import os
 import re
 from collections import Counter, defaultdict
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 import dts
@@ -43,6 +43,23 @@ def _asegurar_columna_temporada_partidos():
 
 
 #_asegurar_columna_temporada_partidos()
+
+
+def _asegurar_columna_fecha_nacimiento_jugadores():
+    """Agrega 'fecha_nacimiento' a la tabla 'jugadores' si todavía no está
+    (create_all() no toca tablas que ya existen). Es idempotente. Los
+    jugadores ya cargados quedan con fecha_nacimiento = NULL y siguen
+    mostrando su edad vieja (aproximada) hasta que se les cargue la fecha."""
+    inspector = inspect(engine)
+    if "jugadores" not in inspector.get_table_names():
+        return  # tabla recién creada por create_all(), ya sale con la columna
+    columnas = [c["name"] for c in inspector.get_columns("jugadores")]
+    if "fecha_nacimiento" not in columnas:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE jugadores ADD COLUMN fecha_nacimiento DATE"))
+
+
+_asegurar_columna_fecha_nacimiento_jugadores()
 
 app = FastAPI(title="Futbol Tracker API")
 
@@ -388,6 +405,36 @@ def _mapa_equipos_por_jugador(jugador_ids: List[int], db: Session) -> dict[int, 
     return {jid: sorted(equipos) for jid, equipos in mapa.items()}
 
 
+def _calcular_edad(j: models.Jugador) -> Optional[int]:
+    """Edad al día de hoy. Si hay fecha de nacimiento, se calcula (siempre
+    al día). Si no, se usa la edad vieja guardada como respaldo."""
+    fn = j.fecha_nacimiento
+    if fn:
+        hoy = date.today()
+        return hoy.year - fn.year - ((hoy.month, hoy.day) < (fn.month, fn.day))
+    return j.edad
+
+
+def _validar_fecha_nacimiento(fn: Optional[date]) -> None:
+    if fn is None:
+        return
+    if fn > date.today():
+        raise HTTPException(status_code=400, detail="La fecha de nacimiento no puede ser futura")
+    if fn.year < 1900:
+        raise HTTPException(status_code=400, detail="La fecha de nacimiento no es válida")
+
+
+def _parse_fecha(txt: Optional[str]) -> Optional[date]:
+    """Acepta 2001-03-25, 25/03/2001 y 25-03-2001."""
+    txt = (txt or "").strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(txt, fmt).date()
+        except ValueError:
+            pass
+    return None
+
+
 def _serializar_jugadores(jugadores: List[models.Jugador], db: Session) -> List[dict]:
     mapa_equipos = _mapa_equipos_por_jugador([j.id for j in jugadores], db)
     return [
@@ -396,7 +443,9 @@ def _serializar_jugadores(jugadores: List[models.Jugador], db: Session) -> List[
             "nombre": j.nombre,
             "nacionalidad": j.nacionalidad,
             "posicion": j.posicion,
-            "edad": j.edad,
+            "fecha_nacimiento": j.fecha_nacimiento,
+            "edad": _calcular_edad(j),
+            "edad_aproximada": j.fecha_nacimiento is None and j.edad is not None,
             "equipos": mapa_equipos.get(j.id, []),
         }
         for j in jugadores
@@ -448,7 +497,14 @@ def obtener_jugadores(
     if orden == "goles":
         query = query.order_by(goles_col.desc(), models.Jugador.nombre)
     elif orden == "edad":
-        query = query.order_by(func.coalesce(models.Jugador.edad, 0).desc(), models.Jugador.nombre)
+        # Más viejo primero: por fecha de nacimiento (los que no la tienen,
+        # al final de ese grupo, ordenados por su edad vieja aproximada).
+        query = query.order_by(
+            models.Jugador.fecha_nacimiento.is_(None),
+            models.Jugador.fecha_nacimiento.asc(),
+            func.coalesce(models.Jugador.edad, 0).desc(),
+            models.Jugador.nombre,
+        )
     else:
         query = query.order_by(models.Jugador.nombre)
     filas = query.offset(skip).limit(limit).all()
@@ -499,8 +555,11 @@ def crear_jugador(jugador: schemas.JugadorCreate, db: Session = Depends(get_db))
             detail=f"Ya existe un jugador llamado '{nombre_clean}'.",
         )
 
+    _validar_fecha_nacimiento(jugador.fecha_nacimiento)
     datos = jugador.model_dump()
     datos["nombre"] = nombre_clean
+    if datos.get("fecha_nacimiento"):
+        datos["edad"] = None  # la edad se calcula desde la fecha
     nuevo_jugador = models.Jugador(**datos)
     db.add(nuevo_jugador)
     try:
@@ -510,6 +569,58 @@ def crear_jugador(jugador: schemas.JugadorCreate, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="Ese jugador ya existe")
     db.refresh(nuevo_jugador)
     return _serializar_jugador(nuevo_jugador, db)
+
+
+@app.post("/jugadores/importar-fechas")
+def importar_fechas_nacimiento(datos: schemas.ImportarFechasRequest, db: Session = Depends(get_db)):
+    """Carga fechas de nacimiento en lote desde un CSV con las columnas
+    'nombre' y 'fecha_nacimiento' (se puede usar directamente el CSV de
+    Exportar > Jugadores, completando esa columna). Acepta separador coma o
+    punto y coma, y fechas 2001-03-25 o 25/03/2001. Las filas con la fecha
+    vacía se ignoran. El jugador se busca por nombre (sin importar
+    mayúsculas)."""
+    texto = datos.csv_texto.lstrip("\ufeff")
+    if not texto.strip():
+        raise HTTPException(status_code=400, detail="El archivo está vacío")
+    primera = texto.splitlines()[0]
+    delim = ";" if primera.count(";") > primera.count(",") else ","
+    lector = csv.DictReader(io.StringIO(texto), delimiter=delim)
+    campos = {(c or "").strip().lower(): c for c in (lector.fieldnames or [])}
+    if "nombre" not in campos or "fecha_nacimiento" not in campos:
+        raise HTTPException(
+            status_code=400,
+            detail="El CSV tiene que tener las columnas 'nombre' y 'fecha_nacimiento'",
+        )
+
+    por_nombre = {j.nombre.strip().lower(): j for j in db.query(models.Jugador).all()}
+    actualizados, sin_fecha = 0, 0
+    no_encontrados, invalidos = [], []
+    for fila in lector:
+        nombre = (fila.get(campos["nombre"]) or "").strip()
+        valor = (fila.get(campos["fecha_nacimiento"]) or "").strip()
+        if not nombre:
+            continue
+        if not valor:
+            sin_fecha += 1
+            continue
+        jugador = por_nombre.get(nombre.lower())
+        if not jugador:
+            no_encontrados.append(nombre)
+            continue
+        fecha = _parse_fecha(valor)
+        if fecha is None or fecha > date.today() or fecha.year < 1900:
+            invalidos.append(f"{nombre}: {valor}")
+            continue
+        jugador.fecha_nacimiento = fecha
+        jugador.edad = None
+        actualizados += 1
+    db.commit()
+    return {
+        "actualizados": actualizados,
+        "sin_fecha": sin_fecha,
+        "no_encontrados": no_encontrados[:50],
+        "invalidos": invalidos[:50],
+    }
 
 
 @app.put("/jugadores/{jugador_id}", response_model=schemas.JugadorResponse)
@@ -532,7 +643,10 @@ def actualizar_jugador(jugador_id: int, datos: schemas.JugadorUpdate, db: Sessio
     jugador.nombre = nombre_clean
     jugador.nacionalidad = datos.nacionalidad
     jugador.posicion = datos.posicion
-    jugador.edad = datos.edad
+    _validar_fecha_nacimiento(datos.fecha_nacimiento)
+    jugador.fecha_nacimiento = datos.fecha_nacimiento
+    # Con fecha cargada, la edad vieja deja de usarse; sin fecha, se conserva.
+    jugador.edad = None if datos.fecha_nacimiento else datos.edad
 
     try:
         db.commit()
@@ -1388,12 +1502,14 @@ def exportar_csv(tipo: str = Query("completo", pattern="^(completo|partidos|juga
         equipos = _mapa_equipos_por_jugador([j.id for j in jugadores], db)
         goles = dict(db.query(models.Gol.jugador_id, func.count(models.Gol.id)).group_by(models.Gol.jugador_id).all())
         filas = [
-            [j.id, j.nombre, j.nacionalidad or "", j.posicion or "", j.edad or "",
+            [j.id, j.nombre, j.nacionalidad or "", j.posicion or "",
+             j.fecha_nacimiento.isoformat() if j.fecha_nacimiento else "",
+             _calcular_edad(j) if _calcular_edad(j) is not None else "",
              " / ".join(equipos.get(j.id, [])), goles.get(j.id, 0)]
             for j in jugadores
         ]
         return _csv_response(
-            "jugadores", ["id", "nombre", "nacionalidad", "posicion", "edad", "equipos", "goles_totales"], filas
+            "jugadores", ["id", "nombre", "nacionalidad", "posicion", "fecha_nacimiento", "edad", "equipos", "goles_totales"], filas
         )
 
     partidos = list(reversed(_cargar_partidos(db)))  # cronológico

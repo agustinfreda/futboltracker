@@ -70,6 +70,10 @@ class JugadorBase(BaseModel):
     nombre: str
     nacionalidad: Optional[str] = None
     posicion: Optional[str] = None
+    # Dato real que se guarda. La edad se calcula a partir de esta fecha.
+    fecha_nacimiento: Optional[date] = None
+    # En la entrada: solo respaldo para jugadores sin fecha cargada.
+    # En la respuesta: edad ya calculada al día de hoy.
     edad: Optional[int] = None
 
 class JugadorCreate(JugadorBase):
@@ -84,9 +88,17 @@ class JugadorResponse(JugadorBase):
     # Calculado a partir de los goles del jugador (equipos distintos
     # por los que anotó), no es un campo que se guarde ni se edite.
     equipos: List[str] = []
+    # True si la edad es la vieja cargada a mano (todavía no hay fecha de
+    # nacimiento): en ese caso es aproximada y no avanza sola.
+    edad_aproximada: bool = False
 
     class Config:
         from_attributes = True
+
+
+# Para cargar fechas de nacimiento en lote desde un CSV (nombre, fecha_nacimiento).
+class ImportarFechasRequest(BaseModel):
+    csv_texto: str
 
 
 # --- SCHEMAS GOL ---

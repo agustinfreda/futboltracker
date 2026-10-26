@@ -80,6 +80,13 @@ class Jugador(Base):
     nombre = Column(String(150), index=True, nullable=False)
     nacionalidad = Column(String(100), nullable=True)
     posicion = Column(String(50), nullable=True)
+    # Fecha de nacimiento: es el dato real. La edad se CALCULA a partir de
+    # esta fecha cada vez que se consulta (ver _calcular_edad en main.py),
+    # así nunca hay que actualizarla a mano cuando alguien cumple años.
+    fecha_nacimiento = Column(Date, nullable=True)
+    # LEGACY: edad cargada antes de existir fecha_nacimiento. Solo se usa
+    # como respaldo mientras el jugador no tenga fecha; apenas se le carga
+    # la fecha, este campo se pone en NULL y deja de usarse.
     edad = Column(Integer, nullable=True)
     # OJO: acá NO va equipo_actual. El club de un jugador queda fijado
     # por partido, en cada Gol (ver Gol.equipo más abajo), porque un
