@@ -174,13 +174,34 @@
             <div class="card !p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div><h2 class="font-display text-3xl font-bold text-ink leading-none">Directores técnicos</h2><p id="cnt-dts" class="text-xs text-slate-400 mt-1.5">Cargando…</p></div>
                 <div class="flex items-center gap-3 flex-wrap">
-                    <div class="relative"><i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type="text" id="buscar-dts" oninput="renderClubesDT()" placeholder="Buscar club o DT..." class="fld !pl-8 !py-2 w-60"></div>
-                    <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" id="filtro-dts-sin" onchange="renderClubesDT()" class="rounded border-slate-600 text-emerald-500 focus:ring-emerald-500"> Solo sin DT</label>
+                    <div class="flex gap-1 bg-slate-900 rounded-lg p-1">
+                        <button onclick="dtsVista('clubes')" id="dts-sub-clubes" class="px-3 py-1.5 rounded-md text-xs font-medium bg-emerald-500 text-white"><i class="fa-solid fa-shield-halved mr-1.5"></i>Clubes</button>
+                        <button onclick="dtsVista('stats')" id="dts-sub-stats" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-300"><i class="fa-solid fa-chart-column mr-1.5"></i>Estadísticas</button>
+                    </div>
+                    <div id="dts-controles-clubes" class="flex items-center gap-3 flex-wrap">
+                        <div class="relative"><i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                            <input type="text" id="buscar-dts" oninput="renderClubesDT()" placeholder="Buscar club o DT..." class="fld !pl-8 !py-2 w-60"></div>
+                        <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" id="filtro-dts-sin" onchange="renderClubesDT()" class="rounded border-slate-600 text-emerald-500 focus:ring-emerald-500"> Solo sin DT</label>
+                    </div>
                 </div>
             </div>
-            <p class="text-[11px] text-slate-500 px-1">Acá aparecen todos los clubes que ya registraste. Los nuevos salen solos, sin DT, primero en la lista. Tocá un club para cargar o cambiar su DT.</p>
-            <div id="grilla-dts" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
+
+            <div id="dts-vista-clubes" class="space-y-4">
+                <p class="text-[11px] text-slate-500 px-1">Acá aparecen todos los clubes que ya registraste. Los nuevos salen solos, sin DT, primero en la lista. Tocá un club para cargar o cambiar su DT. El DT se muestra en cada partido según la fecha en que se jugó.</p>
+                <div id="grilla-dts" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
+            </div>
+
+            <div id="dts-vista-stats" class="space-y-4 hidden">
+                <div class="flex flex-wrap items-center gap-3 card !p-3">
+                    <i class="fa-solid fa-filter text-slate-500 text-xs ml-1"></i>
+                    <select id="dts-stats-competicion" onchange="cargarStatsDTs()" class="fld !w-auto !py-1.5"><option value="">Todas las competiciones</option></select>
+                    <select id="dts-stats-anio" onchange="cargarStatsDTs()" class="fld !w-auto !py-1.5"><option value="">Todos los años</option></select>
+                    <select id="dts-stats-min" onchange="renderStatsDTs()" class="fld !w-auto !py-1.5" title="Mínimo de partidos vistos para entrar en los rankings de porcentaje">
+                        <option value="1">Mín. 1 partido</option><option value="2" selected>Mín. 2 partidos</option><option value="3">Mín. 3 partidos</option><option value="5">Mín. 5 partidos</option><option value="10">Mín. 10 partidos</option>
+                    </select>
+                </div>
+                <div id="dts-stats-root" class="space-y-4"><p class="text-sm text-slate-400">Cargando estadísticas…</p></div>
+            </div>
         </section>
 
 </main>
@@ -599,8 +620,25 @@
                 <input type="text" id="club-dt-input" placeholder="Nombre del DT" required maxlength="150" class="fld !py-2 !text-sm">
                 <div><label class="block text-[11px] text-slate-400 mb-1">Asume el</label><input type="date" id="club-dt-fecha" required class="fld !py-2 !text-sm"></div>
                 <p id="club-dt-ayuda" class="text-[11px] text-slate-500"></p>
+                <div id="club-dt-primer" class="hidden text-[11px] text-slate-500">
+                    <span id="club-dt-primer-txt"></span>
+                    <button type="button" id="club-dt-primer-btn" onclick="usarPrimerPartidoDT()" class="text-emerald-400 underline ml-1">Usar esa fecha</button>
+                </div>
                 <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">Guardar DT</button>
             </form>
+
+            <details class="border-t border-slate-700 pt-4">
+                <summary class="text-xs font-semibold text-slate-300 cursor-pointer">Cargar un DT anterior (completar la historia)</summary>
+                <form onsubmit="guardarPeriodoDT(event)" class="space-y-3 mt-3">
+                    <p class="text-[11px] text-slate-500">Para que los partidos viejos muestren el DT que tenía el club en esa época. No puede pisarse con otro período.</p>
+                    <input type="text" id="club-per-nombre" placeholder="Nombre del DT" required maxlength="150" class="fld !py-2 !text-sm">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="block text-[11px] text-slate-400 mb-1">Asumió el</label><input type="date" id="club-per-desde" required class="fld !py-2 !text-sm"></div>
+                        <div><label class="block text-[11px] text-slate-400 mb-1">Se fue el</label><input type="date" id="club-per-hasta" required class="fld !py-2 !text-sm"></div>
+                    </div>
+                    <button type="submit" class="w-full btn-ghost justify-center">Agregar al historial</button>
+                </form>
+            </details>
 
             <div class="space-y-2 border-t border-slate-700 pt-4">
                 <p class="text-xs font-semibold text-slate-300">Escudo</p>
@@ -672,7 +710,7 @@
             if (tab === 'partidos') cargarPartidos();
             if (tab === 'jugadores') cargarJugadores();
             if (tab === 'estadisticas') cargarEstadisticas();
-            if (tab === 'dts') cargarClubesDT();
+            if (tab === 'dts') dtsVista(dtsVistaActual);
         }
 
         // --- EQUIPOS ---
@@ -1287,7 +1325,7 @@
                                 <p class="text-[11px] text-slate-400 mt-1 truncate">${p.instancia} • ${p.fecha_partido}</p>
                             </div>
                             <div class="flex items-center gap-2.5 shrink-0">
-                                <button onclick='abrirModalEditarPartido(${JSON.stringify(p)})' title="Editar partido" class="text-slate-500 hover:text-emerald-400 transition-colors">
+                                <button onclick='abrirModalEditarPartido(${JSON.stringify({ ...p, dt_local: undefined, dt_visitante: undefined })})' title="Editar partido" class="text-slate-500 hover:text-emerald-400 transition-colors">
                                     <i class="fa-solid fa-pen text-xs"></i>
                                 </button>
                                 <button onclick="borrarPartido(${p.id})" title="Borrar partido" class="text-slate-500 hover:text-red-400 transition-colors">
@@ -1310,6 +1348,9 @@
                             </p>
                         </div>
 
+                        <div class="flex justify-between gap-2 text-[10px] px-1 mt-1.5 mb-1" title="Director técnico de cada equipo en la fecha del partido">
+                            <span class="truncate w-1/2 ${p.dt_local ? 'text-slate-400' : 'text-slate-600'}"><i class="fa-solid fa-user-tie mr-1"></i>${p.dt_local ? esc(p.dt_local) : '—'}</span>
+                            <span class="truncate w-1/2 text-right ${p.dt_visitante ? 'text-slate-400' : 'text-slate-600'}">${p.dt_visitante ? esc(p.dt_visitante) : '—'}<i class="fa-solid fa-user-tie ml-1"></i></span></div>
                         ${penalesHTML}
                         ${p.estadio ? `<p class="text-[11px] text-slate-500 text-center mb-3"><i class="fa-solid fa-location-dot mr-1"></i>${p.estadio}</p>` : '<div class="mb-3"></div>'}
 
@@ -1880,6 +1921,7 @@
         function marcadorHTML(p) {
             const l = p.equipo_local.toLowerCase(), v = p.equipo_visitante.toLowerCase();
             const gl = p.goles.filter(g => g.equipo.toLowerCase() === l), gv = p.goles.filter(g => g.equipo.toLowerCase() === v);
+            const dt = n => n ? `<p class="text-xs muted mt-1.5"><i class="fa-solid fa-user-tie mr-1.5"></i>${esc(n)}</p>` : '';
             const lista = (gs, alin) => gs.length ? `<ul class="mt-3 space-y-0.5 text-xs ${alin}">` + gs.map(g =>
                 `<li><span class="text-emerald-400 font-semibold tabular-nums">${esc(g.minuto)}'</span> ${esc(g.jugador.nombre)}${g.tipo !== 'JUGADA' ? ` <span class="muted">(${esc(g.tipo.toLowerCase())})</span>` : ''}</li>`).join('') + '</ul>' : '';
             const pen = (p.penales && p.penales_ganador && gl.length === gv.length)
@@ -1889,9 +1931,9 @@
                     <span class="font-semibold px-2.5 py-1 rounded-full" style="background:#0d3a28;color:#6ee7b7">${esc(p.competicion)}${p.temporada ? ' ' + esc(p.temporada) : ''}</span>
                     <span>${esc(p.instancia)}</span><span>${fechaCorta(p.fecha_partido)}</span></div>
                 <div class="grid grid-cols-[1fr_auto_1fr] items-start gap-3 md:gap-6 mt-7">
-                    <div class="text-right"><p class="font-display text-2xl md:text-4xl font-bold leading-tight">${esc(p.equipo_local)}</p>${lista(gl, 'text-right')}</div>
+                    <div class="text-right"><p class="font-display text-2xl md:text-4xl font-bold leading-tight">${esc(p.equipo_local)}</p>${dt(p.dt_local)}${lista(gl, 'text-right')}</div>
                     <p class="font-display text-6xl md:text-8xl font-extrabold leading-none tabular-nums">${gl.length}<span class="muted mx-2 md:mx-3">-</span>${gv.length}</p>
-                    <div><p class="font-display text-2xl md:text-4xl font-bold leading-tight">${esc(p.equipo_visitante)}</p>${lista(gv, '')}</div></div>
+                    <div><p class="font-display text-2xl md:text-4xl font-bold leading-tight">${esc(p.equipo_visitante)}</p>${dt(p.dt_visitante)}${lista(gv, '')}</div></div>
                 ${pen}${p.estadio ? `<p class="text-center text-xs muted mt-5"><i class="fa-solid fa-location-dot mr-1.5"></i>${esc(p.estadio)}</p>` : ''}</div>`;
         }
 
@@ -2060,6 +2102,155 @@
         }
 
         // ================= PESTAÑA DTs =================
+        // ----- Vistas de la pestaña DTs: Clubes / Estadísticas -----
+        let dtsVistaActual = 'clubes';
+        function dtsVista(v) {
+            dtsVistaActual = v;
+            const stats = v === 'stats';
+            document.getElementById('dts-vista-clubes').classList.toggle('hidden', stats);
+            document.getElementById('dts-vista-stats').classList.toggle('hidden', !stats);
+            document.getElementById('dts-controles-clubes').classList.toggle('hidden', stats);
+            [['clubes', 'dts-sub-clubes'], ['stats', 'dts-sub-stats']].forEach(([k, id]) => {
+                const b = document.getElementById(id);
+                b.classList.toggle('bg-emerald-500', k === v);
+                b.classList.toggle('text-white', k === v);
+                b.classList.toggle('text-slate-300', k !== v);
+            });
+            if (stats) cargarStatsDTs(); else cargarClubesDT();
+        }
+
+        // ----- Estadísticas de DTs (se calculan en el servidor cruzando fechas) -----
+        let statsDTsData = null;
+        let filtrosStatsDTsCargados = false;
+
+        async function poblarFiltrosStatsDTs() {
+            if (filtrosStatsDTsCargados) return;
+            try {
+                const [comps, anios] = await Promise.all([
+                    fetch(`${API_URL}/competiciones/`).then(r => r.json()),
+                    fetch(`${API_URL}/partidos/anios-disponibles`).then(r => r.json())
+                ]);
+                const nombres = [...new Set(comps.map(c => c.nombre))].sort();
+                document.getElementById('dts-stats-competicion').innerHTML = '<option value="">Todas las competiciones</option>' + nombres.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+                document.getElementById('dts-stats-anio').innerHTML = '<option value="">Todos los años</option>' + anios.map(a => `<option value="${a}">${a}</option>`).join('');
+                filtrosStatsDTsCargados = true;
+            } catch (e) { /* quedan en "Todas" */ }
+        }
+
+        async function cargarStatsDTs() {
+            await poblarFiltrosStatsDTs();
+            const root = document.getElementById('dts-stats-root');
+            const params = new URLSearchParams();
+            const comp = document.getElementById('dts-stats-competicion').value;
+            const anio = document.getElementById('dts-stats-anio').value;
+            if (comp) params.set('competicion', comp);
+            if (anio) params.set('anio', anio);
+            try {
+                const res = await fetch(`${API_URL}/dts/estadisticas${params.toString() ? '?' + params : ''}`);
+                if (!res.ok) throw new Error();
+                statsDTsData = await res.json();
+            } catch (e) {
+                root.innerHTML = tarjeta('No se pudieron cargar las estadísticas de DTs', 'fa-triangle-exclamation', 'text-amber-400', vacio('Revisá que el servidor esté corriendo con el main.py actualizado.'));
+                return;
+            }
+            renderStatsDTs();
+        }
+
+        function rankingDT(items, fmt, color = 'bg-emerald-400') {
+            if (!items.length) return vacio('Ningún DT llega al mínimo de partidos elegido.');
+            const max = Math.max(...items.map(i => i.valor)) || 1;
+            return '<div class="space-y-3">' + items.map((it, i) => `
+                <div><div class="flex justify-between gap-3 text-xs mb-1">
+                    <span class="text-ink font-medium truncate"><span class="text-slate-500 tabular-nums inline-block w-5">${i + 1}</span>${esc(it.nombre)}${it.sub ? ` <span class="text-slate-500 font-normal">· ${esc(it.sub)}</span>` : ''}</span>
+                    <span class="text-slate-400 tabular-nums shrink-0">${fmt(it)}</span></div>
+                <div class="h-1.5 rounded-full bg-slate-900 overflow-hidden"><div class="h-full rounded-full ${color}" style="width:${Math.max(4, it.valor / max * 100)}%"></div></div></div>`).join('') + '</div>';
+        }
+
+        function renderStatsDTs() {
+            const a = statsDTsData;
+            const root = document.getElementById('dts-stats-root');
+            if (!a) return;
+            if (!a.total_dts) {
+                root.innerHTML = tarjeta('Todavía no hay datos de DTs', 'fa-user-tie', 'text-emerald-400',
+                    vacio(a.cobertura.total ? 'Ningún partido cae dentro de las fechas en que cargaste DTs. Entrá a un club y poné la fecha en que asumió el DT (o cargá los anteriores con "Cargar un DT anterior").' : 'No hay partidos con estos filtros.'));
+                return;
+            }
+            const min = +document.getElementById('dts-stats-min').value;
+            const clubes = t => t.clubes.join(', ');
+            const mk = (t, valor) => ({ nombre: t.nombre, sub: clubes(t), valor, t });
+            const top = (arr, n = 5) => arr.slice(0, n);
+            const elegibles = a.tabla.filter(t => t.pj >= min);
+            const dec = n => Number(n).toLocaleString('es-AR', { maximumFractionDigits: 2 });
+
+            const masVistos = top([...a.tabla].sort((x, y) => y.pj - x.pj || y.pct_victorias - x.pct_victorias)).map(t => mk(t, t.pj));
+            const pctVic = top([...elegibles].sort((x, y) => y.pct_victorias - x.pct_victorias || y.pj - x.pj)).map(t => mk(t, t.pct_victorias));
+            const ataque = top([...elegibles].sort((x, y) => y.gf_pp - x.gf_pp || y.pj - x.pj)).map(t => mk(t, t.gf_pp));
+            const defensa = top([...elegibles].sort((x, y) => x.gc_pp - y.gc_pp || y.pj - x.pj)).map(t => mk(t, 1 / (1 + t.gc_pp)));
+            const rachas = top([...elegibles].filter(t => t.mejor_racha > 0).sort((x, y) => y.mejor_racha - x.mejor_racha || y.pj - x.pj)).map(t => mk(t, t.mejor_racha));
+            const penales = top(a.tabla.filter(t => t.pen_g + t.pen_p > 0).sort((x, y) => (y.pen_g - y.pen_p) - (x.pen_g - x.pen_p) || y.pen_g - x.pen_g)).map(t => mk(t, t.pen_g));
+
+            const cob = a.cobertura.total ? Math.round(a.cobertura.con_dt / a.cobertura.total * 100) : 0;
+            const duelos = a.duelos.length ? '<ul class="space-y-3">' + a.duelos.map(d => `
+                <li class="text-xs"><p class="text-ink font-medium">${esc(d.a)} <span class="text-slate-500 font-normal">vs</span> ${esc(d.b)}</p>
+                <p class="text-slate-400 mt-0.5 tabular-nums">${d.ga} ${d.ga === 1 ? 'victoria' : 'victorias'} · ${d.e} ${d.e === 1 ? 'empate' : 'empates'} · ${d.gb} ${d.gb === 1 ? 'victoria' : 'victorias'} <span class="text-slate-500">(${plural(d.pj, 'partido', 'partidos')})</span></p></li>`).join('') + '</ul>'
+                : vacio('Todavía no viste partidos con los dos DTs cargados.');
+            const goleada = a.mayor_goleada
+                ? `<ul class="space-y-3.5">${recordFila('fa-bolt', `${esc(a.mayor_goleada.dt)} <span class="text-slate-500">· ${esc(a.mayor_goleada.club)}</span>`, `${esc(a.mayor_goleada.partido)} (+${a.mayor_goleada.diferencia})`)}</ul>`
+                : vacio('Todavía no hay victorias.');
+
+            const filasTabla = [...a.tabla].sort((x, y) => y.pj - x.pj || y.pct_victorias - x.pct_victorias).map(t => `
+                <tr class="border-b border-slate-700/50 last:border-0"><td class="px-2 py-2 text-ink font-medium">${esc(t.nombre)}<span class="block text-[10px] text-slate-500 font-normal">${esc(clubes(t))}</span></td>
+                <td class="px-2 py-2 text-right text-slate-300">${t.pj}</td><td class="px-2 py-2 text-right text-emerald-400 font-semibold">${t.g}</td><td class="px-2 py-2 text-right text-slate-300">${t.e}</td><td class="px-2 py-2 text-right text-slate-300">${t.p}</td>
+                <td class="px-2 py-2 text-right text-slate-300">${t.gf}</td><td class="px-2 py-2 text-right text-slate-300">${t.gc}</td>
+                <td class="px-2 py-2 text-right text-ink font-semibold">${t.pct_victorias}%</td><td class="px-2 py-2 text-right text-slate-300">${t.efectividad}%</td></tr>`).join('');
+            const tablaHTML = `<div class="overflow-auto max-h-96"><table class="w-full text-sm tabular-nums"><thead><tr class="text-xs text-slate-400 border-b border-slate-700">
+                <th class="px-2 py-2 text-left font-medium sticky top-0 bg-slate-800">DT</th>${['PJ', 'G', 'E', 'P', 'GF', 'GC', '% Vic.', 'Efect.'].map(h => `<th class="px-2 py-2 text-right font-medium sticky top-0 bg-slate-800">${h}</th>`).join('')}</tr></thead><tbody>${filasTabla}</tbody></table></div>
+                <p class="text-[11px] text-slate-500 mt-3">Solo cuentan los partidos que viste y en los que el DT ya estaba cargado en esa fecha. Las victorias incluyen definición por penales. Efect. = puntos obtenidos sobre los posibles (3 por victoria, 1 por empate).</p>`;
+
+            root.innerHTML = `
+                <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                    ${kpi(NUM(a.total_dts), 'DTs vistos', 'distintos, según tus partidos')}
+                    ${kpi(cob + '%', 'Partidos con DT cargado', `${NUM(a.cobertura.con_dt)} de ${NUM(a.cobertura.total)} partidos`)}
+                    ${kpi(NUM(a.cobertura.con_ambos), 'Duelos de DT contra DT', 'partidos con los dos DTs conocidos')}
+                    ${kpi(NUM(a.carrusel.length ? a.carrusel[0].valor : 0), 'DTs en un mismo club', a.carrusel.length ? `récord: ${esc(a.carrusel[0].nombre)}` : '')}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    ${tarjeta('Más porcentaje de victorias', 'fa-percent', 'text-emerald-400', rankingDT(pctVic, it => `${it.t.pct_victorias}% · ${it.t.g}/${it.t.pj}`))}
+                    ${tarjeta('DTs más vistos', 'fa-eye', 'text-sky-400', rankingDT(masVistos, it => plural(it.t.pj, 'partido', 'partidos'), 'bg-sky-400'))}
+                    ${tarjeta('Mejor ataque (goles por partido)', 'fa-futbol', 'text-amber-400', rankingDT(ataque, it => dec(it.t.gf_pp), 'bg-amber-400'))}
+                    ${tarjeta('Mejor defensa (menos goles en contra)', 'fa-shield-halved', 'text-purple-400', rankingDT(defensa, it => `${dec(it.t.gc_pp)} por partido`, 'bg-purple-400'))}
+                    ${tarjeta('Mejor racha de victorias', 'fa-fire', 'text-rose-400', rankingDT(rachas, it => plural(it.t.mejor_racha, 'seguida', 'seguidas'), 'bg-rose-400'))}
+                    ${tarjeta('Reyes de los penales', 'fa-bullseye', 'text-yellow-400', penales.length ? rankingDT(penales, it => `${it.t.pen_g} ganados · ${it.t.pen_p} perdidos`, 'bg-yellow-400') : vacio('Todavía no viste definiciones por penales con DTs cargados.'))}
+                </div>
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                    ${tarjeta('Duelos de DTs más repetidos', 'fa-people-arrows', 'text-sky-400', duelos)}
+                    ${tarjeta('Clubes con más DTs distintos', 'fa-rotate', 'text-amber-400', ranking(a.carrusel, { unidad: ['DT', 'DTs'], color: 'bg-amber-400', vacioMsg: 'Todavía no hay datos.' }))}
+                    ${tarjeta('Mayor goleada de un DT', 'fa-bolt', 'text-emerald-400', goleada)}
+                </div>
+                ${tarjeta('Todos los DTs', 'fa-table-list', 'text-emerald-400', tablaHTML)}`;
+        }
+
+        // Rellena la fecha con la del primer partido que viste de ese club.
+        function usarPrimerPartidoDT() {
+            const c = clubesDT.find(x => x.equipo_id === clubDTId);
+            if (c && c.primer_partido) document.getElementById('club-dt-fecha').value = c.primer_partido;
+        }
+
+        async function guardarPeriodoDT(e) {
+            e.preventDefault();
+            await apiRequest(`${API_URL}/dts/clubes/${clubDTId}/periodo`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nombre: document.getElementById('club-per-nombre').value,
+                    desde: document.getElementById('club-per-desde').value,
+                    hasta: document.getElementById('club-per-hasta').value
+                })
+            });
+            await refrescarClubDT();
+        }
+
+
         // Los clubes salen de la tabla de equipos; el DT actual es el registro
         // del historial sin fecha de fin. Cambiar el DT cierra el anterior solo.
         let clubesDT = [];
@@ -2126,6 +2317,13 @@
                 : 'Podés cambiarlo más adelante: el anterior queda guardado en el historial.';
             document.getElementById('club-dt-input').value = '';
             document.getElementById('club-dt-fecha').value = dtHoy();
+            const pp = document.getElementById('club-dt-primer');
+            pp.classList.toggle('hidden', !c.primer_partido);
+            if (c.primer_partido) {
+                document.getElementById('club-dt-primer-txt').textContent = `Tenés partidos de este club desde el ${dtFecha(c.primer_partido)}. Cada partido muestra el DT que había en su fecha.`;
+                document.getElementById('club-dt-primer-btn').classList.toggle('hidden', !!c.dt_actual);
+            }
+            ['club-per-nombre', 'club-per-desde', 'club-per-hasta'].forEach(i => document.getElementById(i).value = '');
             document.getElementById('club-escudo-url').value = (c.escudo && c.escudo.startsWith('http')) ? c.escudo : '';
             document.getElementById('modal-club-dt').classList.remove('hidden');
             cargarHistorialDT();

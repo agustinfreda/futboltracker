@@ -628,7 +628,9 @@ def obtener_partidos(
     query = _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales)
     fecha = models.Partido.fecha_partido
     orden_cols = (fecha.desc(), models.Partido.id.desc()) if orden == "reciente" else (fecha.asc(), models.Partido.id.asc())
-    return query.order_by(*orden_cols).offset(skip).limit(limit).all()
+    resultado = query.order_by(*orden_cols).offset(skip).limit(limit).all()
+    dts.anotar_dts(db, resultado)
+    return resultado
 
 
 @app.get("/partidos/conteo")
@@ -690,6 +692,7 @@ def crear_partido(partido: schemas.PartidoCreate, db: Session = Depends(get_db))
         db.rollback()
         raise HTTPException(status_code=400, detail="Ya existe un partido igual registrado")
     db.refresh(nuevo_partido)
+    dts.anotar_dts(db, [nuevo_partido])
     return nuevo_partido
 
 
@@ -747,6 +750,7 @@ def actualizar_partido(partido_id: int, datos: schemas.PartidoUpdate, db: Sessio
         db.rollback()
         raise HTTPException(status_code=400, detail="Ya existe un partido igual registrado")
     db.refresh(partido)
+    dts.anotar_dts(db, [partido])
     return partido
 
 
@@ -1024,6 +1028,9 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         .first()
     )
 
+    if ultimo_partido:
+        dts.anotar_dts(db, [ultimo_partido])
+
     filas_goleadores = (
         db.query(models.Jugador.nombre, func.count(models.Gol.id).label("total"))
         .join(models.Gol, models.Jugador.id == models.Gol.jugador_id)
@@ -1216,6 +1223,7 @@ def _metricas(partidos):
 def panel_dashboard(db: Session = Depends(get_db)):
     partidos = _cargar_partidos(db)
     data = _metricas(partidos)
+    dts.anotar_dts(db, partidos[:1])  # DTs del último partido (marcador de Inicio)
     hoy = date.today()
     data["partidos_anio"] = sum(1 for p in partidos if p.fecha_partido.year == hoy.year)
     data["anio_actual"] = hoy.year
@@ -1239,6 +1247,115 @@ def estadisticas_avanzadas(
     competicion: Optional[str] = None, anio: Optional[int] = None, db: Session = Depends(get_db)
 ):
     return _metricas(_cargar_partidos(db, competicion, anio))
+
+
+# ==========================================================
+# ESTADÍSTICAS DE DTs
+# Cruza la fecha de cada partido visto con el DT que tenía cada club ese día
+# (pestaña DTs). Solo cuentan los partidos con DT cargado para esa fecha.
+# ==========================================================
+@app.get("/dts/estadisticas")
+def estadisticas_dts(
+    competicion: Optional[str] = None, anio: Optional[int] = None, db: Session = Depends(get_db)
+):
+    partidos = sorted(_cargar_partidos(db, competicion, anio), key=lambda p: (p.fecha_partido, p.id))
+    idx = dts.cargar_indice(db)
+
+    nuevo = lambda: {
+        "nombre": "", "clubes": set(), "pj": 0, "g": 0, "e": 0, "p": 0, "gf": 0, "gc": 0,
+        "pen_g": 0, "pen_p": 0, "racha": 0, "mejor_racha": 0,
+    }
+    por_dt = defaultdict(nuevo)
+    duelos = {}
+    dts_por_club = defaultdict(set)
+    mayor_goleada = None
+    con_alguno = con_ambos = 0
+
+    for p in partidos:
+        gl, gv = _marcador(p)
+        ganador = _ganador_partido(p)  # incluye definición por penales
+        lados = (
+            (p.equipo_local, dts.dt_en_fecha(idx, p.equipo_local, p.fecha_partido), gl, gv, "local"),
+            (p.equipo_visitante, dts.dt_en_fecha(idx, p.equipo_visitante, p.fecha_partido), gv, gl, "visitante"),
+        )
+        conocidos = [l for l in lados if l[1]]
+        con_alguno += bool(conocidos)
+        con_ambos += len(conocidos) == 2
+        empate_en_cancha = gl == gv
+
+        for club, dt_nombre, gf, gc, lado in conocidos:
+            r = por_dt[dt_nombre.strip().lower()]
+            r["nombre"] = r["nombre"] or dt_nombre
+            r["clubes"].add(club)
+            dts_por_club[club].add(dt_nombre.strip().lower())
+            r["pj"] += 1
+            r["gf"] += gf
+            r["gc"] += gc
+            if ganador == lado:
+                r["g"] += 1
+                r["racha"] += 1
+                r["mejor_racha"] = max(r["mejor_racha"], r["racha"])
+                if empate_en_cancha:
+                    r["pen_g"] += 1
+                if gf - gc > 0 and (mayor_goleada is None or gf - gc > mayor_goleada["diferencia"]):
+                    mayor_goleada = {
+                        "dt": dt_nombre, "club": club, "diferencia": gf - gc,
+                        "partido": f"{p.equipo_local} {gl}-{gv} {p.equipo_visitante}",
+                    }
+            else:
+                r["racha"] = 0
+                if ganador is None:
+                    r["e"] += 1
+                else:
+                    r["p"] += 1
+                    if empate_en_cancha:
+                        r["pen_p"] += 1
+
+        if len(conocidos) == 2:
+            (_, a, _, _, la), (_, b, _, _, lb) = conocidos
+            ka, kb = a.strip().lower(), b.strip().lower()
+            if ka != kb:
+                clave = tuple(sorted((ka, kb)))
+                d = duelos.setdefault(clave, {"nombres": {ka: a, kb: b}, "pj": 0, "g": {ka: 0, kb: 0}, "e": 0})
+                d["pj"] += 1
+                if ganador is None:
+                    d["e"] += 1
+                else:
+                    d["g"][ka if ganador == la else kb] += 1
+
+    tabla = []
+    for r in por_dt.values():
+        pj = r["pj"]
+        tabla.append({
+            "nombre": r["nombre"], "clubes": sorted(r["clubes"]), "pj": pj,
+            "g": r["g"], "e": r["e"], "p": r["p"], "gf": r["gf"], "gc": r["gc"],
+            "dg": r["gf"] - r["gc"],
+            "pct_victorias": round(r["g"] / pj * 100) if pj else 0,
+            "efectividad": round((3 * r["g"] + r["e"]) / (3 * pj) * 100) if pj else 0,
+            "gf_pp": round(r["gf"] / pj, 2) if pj else 0,
+            "gc_pp": round(r["gc"] / pj, 2) if pj else 0,
+            "pen_g": r["pen_g"], "pen_p": r["pen_p"], "mejor_racha": r["mejor_racha"],
+        })
+
+    top_duelos = sorted(duelos.values(), key=lambda d: -d["pj"])[:5]
+    duelos_out = []
+    for d in top_duelos:
+        (ka, kb) = list(d["nombres"].keys())
+        duelos_out.append({
+            "a": d["nombres"][ka], "b": d["nombres"][kb], "pj": d["pj"],
+            "ga": d["g"][ka], "gb": d["g"][kb], "e": d["e"],
+        })
+
+    carrusel = sorted(((c, len(s)) for c, s in dts_por_club.items()), key=lambda x: -x[1])[:5]
+
+    return {
+        "cobertura": {"total": len(partidos), "con_dt": con_alguno, "con_ambos": con_ambos},
+        "total_dts": len(tabla),
+        "tabla": tabla,
+        "duelos": duelos_out,
+        "carrusel": [{"nombre": c, "valor": n} for c, n in carrusel],
+        "mayor_goleada": mayor_goleada,
+    }
 
 
 def _csv_response(nombre: str, columnas: list, filas: list) -> Response:

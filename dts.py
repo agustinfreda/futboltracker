@@ -4,6 +4,7 @@ Los clubes salen de la tabla 'equipos' que ya existe, así que cualquier
 club nuevo que se registre al cargar un partido aparece solo en la grilla
 (sin DT, esperando que lo cargues). No toca ninguna tabla existente.
 """
+from collections import defaultdict
 from datetime import date
 from typing import List, Optional
 
@@ -11,6 +12,7 @@ import models
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/dts", tags=["DTs"])
@@ -25,6 +27,12 @@ class CambioDT(BaseModel):
 
 class EditarDT(BaseModel):
     nombre: str
+
+
+class PeriodoDT(BaseModel):
+    nombre: str
+    desde: date
+    hasta: date  # fecha en que dejó el cargo (ya cerrado)
 
 
 class EscudoIn(BaseModel):
@@ -42,11 +50,48 @@ def _dt_json(d: models.DT) -> dict:
     return {"id": d.id, "nombre": d.nombre, "desde": d.desde, "hasta": d.hasta}
 
 
+# ---------- Qué DT tenía cada club en cada fecha ----------
+def cargar_indice(db: Session) -> dict:
+    """nombre de club (minúsculas) -> lista de (desde, hasta, nombre del DT)."""
+    idx = defaultdict(list)
+    filas = (
+        db.query(models.DT, models.Equipo.nombre)
+        .join(models.Equipo, models.Equipo.id == models.DT.equipo_id)
+        .all()
+    )
+    for dt, club in filas:
+        idx[club.strip().lower()].append((dt.desde, dt.hasta, dt.nombre))
+    return idx
+
+
+def dt_en_fecha(idx: dict, club: str, fecha: date) -> Optional[str]:
+    """DT que dirigía al club ese día. El que asume en una fecha ya dirige
+    ese mismo día; el anterior dirige hasta el día anterior."""
+    for desde, hasta, nombre in idx.get((club or "").strip().lower(), ()):
+        if desde <= fecha and (hasta is None or fecha < hasta):
+            return nombre
+    return None
+
+
+def anotar_dts(db: Session, partidos) -> None:
+    """Le pega a cada partido dt_local / dt_visitante (los lee PartidoResponse)."""
+    idx = cargar_indice(db)
+    for p in partidos:
+        p.dt_local = dt_en_fecha(idx, p.equipo_local, p.fecha_partido)
+        p.dt_visitante = dt_en_fecha(idx, p.equipo_visitante, p.fecha_partido)
+
+
 @router.get("/clubes")
 def listar_clubes(db: Session = Depends(get_db)):
     """Todos los clubes con su escudo y DT actual (o null si falta cargarlo)."""
     equipos = db.query(models.Equipo).order_by(models.Equipo.nombre).all()
     escudos = {e.equipo_id: e.escudo for e in db.query(models.EquipoEscudo).all()}
+    primero = {}
+    for col in (models.Partido.equipo_local, models.Partido.equipo_visitante):
+        for nombre, f in db.query(col, func.min(models.Partido.fecha_partido)).group_by(col).all():
+            k = (nombre or "").strip().lower()
+            if k not in primero or f < primero[k]:
+                primero[k] = f
     actuales, totales = {}, {}
     for d in db.query(models.DT).all():
         totales[d.equipo_id] = totales.get(d.equipo_id, 0) + 1
@@ -59,6 +104,7 @@ def listar_clubes(db: Session = Depends(get_db)):
             "escudo": escudos.get(e.id),
             "dt_actual": _dt_json(actuales[e.id]) if e.id in actuales else None,
             "total_dts": totales.get(e.id, 0),
+            "primer_partido": primero.get(e.nombre.strip().lower()),
         }
         for e in equipos
     ]
@@ -90,6 +136,30 @@ def poner_o_cambiar_dt(equipo_id: int, datos: CambioDT, db: Session = Depends(ge
         actual.hasta = desde
 
     nuevo = models.DT(equipo_id=equipo_id, nombre=nombre, desde=desde, hasta=None)
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    return _dt_json(nuevo)
+
+
+@router.post("/clubes/{equipo_id}/periodo")
+def cargar_periodo_anterior(equipo_id: int, datos: PeriodoDT, db: Session = Depends(get_db)):
+    """Agrega un DT que ya se fue (con fecha de entrada y de salida), para
+    completar la historia hacia atrás sin tocar al DT actual. No puede
+    pisarse con otro período del mismo club."""
+    _equipo_o_404(db, equipo_id)
+    nombre = datos.nombre.strip()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="El nombre del DT no puede estar vacío")
+    if datos.hasta <= datos.desde:
+        raise HTTPException(status_code=400, detail="La fecha de salida tiene que ser posterior a la de entrada")
+    for o in db.query(models.DT).filter(models.DT.equipo_id == equipo_id).all():
+        if datos.desde < (o.hasta or date.max) and o.desde < datos.hasta:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Se superpone con {o.nombre} ({o.desde.isoformat()} a {o.hasta.isoformat() if o.hasta else 'hoy'})",
+            )
+    nuevo = models.DT(equipo_id=equipo_id, nombre=nombre, desde=datos.desde, hasta=datos.hasta)
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)

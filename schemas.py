@@ -140,6 +140,10 @@ class PartidoUpdate(PartidoBase):
 class PartidoResponse(PartidoBase):
     id: int
     goles: List[GolResponse] = []
+    # DT de cada equipo EN LA FECHA del partido (sale de la pestaña DTs).
+    # None si todavía no hay un DT cargado para esa fecha.
+    dt_local: Optional[str] = None
+    dt_visitante: Optional[str] = None
 
     class Config:
         from_attributes = True
