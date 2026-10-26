@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from datetime import date
 from typing import List, Optional
 
+import dts
 import models
 import schemas
 from database import engine, get_db
@@ -52,6 +53,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(dts.router)
 
 # ---------------------------------------------------------
 # MONTAR ARCHIVOS ESTÁTICOS Y SERVIR EL INDEX.HTML

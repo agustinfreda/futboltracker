@@ -65,6 +65,7 @@
                 <button onclick="cambiarTab('inicio')" id="tab-inicio" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors bg-emerald-500 text-white whitespace-nowrap"><i class="fa-solid fa-house mr-2"></i>Inicio</button>
                 <button onclick="cambiarTab('partidos')" id="tab-partidos" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-tv mr-2"></i>Partidos Vistos</button>
                 <button onclick="cambiarTab('jugadores')" id="tab-jugadores" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-users mr-2"></i>Jugadores</button>
+                <button onclick="cambiarTab('dts')" id="tab-dts" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-user-tie mr-2"></i>DTs</button>
                 <button onclick="cambiarTab('estadisticas')" id="tab-estadisticas" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-chart-line mr-2"></i>Estadísticas</button>
             </nav>
             <div class="flex items-center gap-2 order-2 sm:order-3">
@@ -167,6 +168,21 @@
         </section>
 
     
+
+        <!-- ================= PESTAÑA DTs ================= -->
+        <section id="sec-dts" class="space-y-4 hidden">
+            <div class="card !p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div><h2 class="font-display text-3xl font-bold text-ink leading-none">Directores técnicos</h2><p id="cnt-dts" class="text-xs text-slate-400 mt-1.5">Cargando…</p></div>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <div class="relative"><i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="buscar-dts" oninput="renderClubesDT()" placeholder="Buscar club o DT..." class="fld !pl-8 !py-2 w-60"></div>
+                    <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" id="filtro-dts-sin" onchange="renderClubesDT()" class="rounded border-slate-600 text-emerald-500 focus:ring-emerald-500"> Solo sin DT</label>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-500 px-1">Acá aparecen todos los clubes que ya registraste. Los nuevos salen solos, sin DT, primero en la lista. Tocá un club para cargar o cambiar su DT.</p>
+            <div id="grilla-dts" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
+        </section>
+
 </main>
 
 
@@ -569,6 +585,42 @@
     </div>
 
 
+    <!-- MODAL: CLUB (DT + ESCUDO + HISTORIAL) -->
+    <div id="modal-club-dt" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="cerrarModalClubDT()" class="absolute top-4 right-4 text-slate-400 hover:text-ink" aria-label="Cerrar"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div class="flex items-center gap-3 pr-8">
+                <div id="club-dt-escudo"></div>
+                <div class="min-w-0"><h3 id="club-dt-nombre" class="font-display text-2xl font-bold text-ink leading-none truncate"></h3><p id="club-dt-actual" class="text-xs text-slate-400 mt-1"></p></div>
+            </div>
+
+            <form onsubmit="guardarDT(event)" class="space-y-3 border-t border-slate-700 pt-4">
+                <p class="text-xs font-semibold text-slate-300" id="club-dt-form-titulo">Poner DT</p>
+                <input type="text" id="club-dt-input" placeholder="Nombre del DT" required maxlength="150" class="fld !py-2 !text-sm">
+                <div><label class="block text-[11px] text-slate-400 mb-1">Asume el</label><input type="date" id="club-dt-fecha" required class="fld !py-2 !text-sm"></div>
+                <p id="club-dt-ayuda" class="text-[11px] text-slate-500"></p>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">Guardar DT</button>
+            </form>
+
+            <div class="space-y-2 border-t border-slate-700 pt-4">
+                <p class="text-xs font-semibold text-slate-300">Escudo</p>
+                <div class="flex gap-2">
+                    <input type="url" id="club-escudo-url" placeholder="https://… (link a la imagen)" class="fld !py-2 !text-sm">
+                    <button type="button" onclick="guardarEscudoURL()" class="btn-ghost whitespace-nowrap">Usar link</button>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <label class="btn-ghost cursor-pointer"><i class="fa-solid fa-upload"></i>Subir imagen<input type="file" accept="image/*" class="hidden" onchange="subirEscudo(event)"></label>
+                    <button type="button" onclick="quitarEscudo()" class="btn-ghost"><i class="fa-solid fa-trash-can"></i>Quitar</button>
+                </div>
+            </div>
+
+            <div class="border-t border-slate-700 pt-4">
+                <p class="text-xs font-semibold text-slate-300 mb-2">Historial de DTs</p>
+                <div id="club-dt-historial" class="space-y-1.5"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Vacío = URL relativa: el navegador le pega al mismo origen que
         // sirvió esta página (funciona igual en localhost que en Render,
@@ -620,6 +672,7 @@
             if (tab === 'partidos') cargarPartidos();
             if (tab === 'jugadores') cargarJugadores();
             if (tab === 'estadisticas') cargarEstadisticas();
+            if (tab === 'dts') cargarClubesDT();
         }
 
         // --- EQUIPOS ---
@@ -2004,6 +2057,172 @@
                 </div>`;
             tablaEquiposData = a.tabla_equipos;
             renderTablaEquipos();
+        }
+
+        // ================= PESTAÑA DTs =================
+        // Los clubes salen de la tabla de equipos; el DT actual es el registro
+        // del historial sin fecha de fin. Cambiar el DT cierra el anterior solo.
+        let clubesDT = [];
+        let clubDTId = null;
+
+        const dtEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const dtFecha = f => f ? f.split('-').reverse().join('/') : '';
+        const dtHoy = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+        function escudoHTML(c, clases) {
+            if (c.escudo) {
+                return `<img src="${dtEsc(c.escudo)}" alt="" loading="lazy" class="${clases} object-contain" onerror="this.outerHTML='<div class=&quot;${clases} rounded-full bg-slate-700 flex items-center justify-center text-slate-400&quot;><i class=&quot;fa-solid fa-shield-halved&quot;></i></div>'">`;
+            }
+            const ini = c.nombre.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+            return `<div class="${clases} rounded-full bg-slate-700 flex items-center justify-center font-display font-bold text-slate-300 text-xl">${dtEsc(ini)}</div>`;
+        }
+
+        async function cargarClubesDT() {
+            try {
+                clubesDT = await apiRequest(`${API_URL}/dts/clubes`);
+            } catch (e) { clubesDT = []; }
+            renderClubesDT();
+        }
+
+        function renderClubesDT() {
+            const q = normalizarTexto((document.getElementById('buscar-dts').value || '').trim());
+            const soloSin = document.getElementById('filtro-dts-sin').checked;
+            const sinDT = clubesDT.filter(c => !c.dt_actual).length;
+            document.getElementById('cnt-dts').textContent =
+                `${clubesDT.length} clubes · ${sinDT} sin DT cargado`;
+
+            const lista = clubesDT
+                .filter(c => !soloSin || !c.dt_actual)
+                .filter(c => !q || normalizarTexto(c.nombre).includes(q) || normalizarTexto(c.dt_actual ? c.dt_actual.nombre : '').includes(q))
+                .sort((a, b) => (!!a.dt_actual - !!b.dt_actual) || a.nombre.localeCompare(b.nombre));
+
+            const grilla = document.getElementById('grilla-dts');
+            if (lista.length === 0) {
+                grilla.innerHTML = `<p class="col-span-full text-sm text-slate-400 text-center py-10">${clubesDT.length === 0 ? 'Todavía no hay clubes registrados. Aparecen cuando cargás un partido.' : 'No hay clubes con ese filtro.'}</p>`;
+                return;
+            }
+            grilla.innerHTML = lista.map(c => `
+                <button onclick="abrirModalClubDT(${c.equipo_id})" class="card !p-4 text-center hover:border-emerald-500 transition-colors flex flex-col items-center gap-2">
+                    ${escudoHTML(c, 'w-20 h-20')}
+                    <p class="text-sm font-semibold text-ink leading-tight">${dtEsc(c.nombre)}</p>
+                    ${c.dt_actual
+                        ? `<p class="text-xs text-slate-300"><i class="fa-solid fa-user-tie text-emerald-400 mr-1"></i>${dtEsc(c.dt_actual.nombre)}</p><p class="text-[10px] text-slate-500">desde ${dtFecha(c.dt_actual.desde)}</p>`
+                        : `<p class="text-xs text-amber-400 font-medium"><i class="fa-solid fa-circle-exclamation mr-1"></i>Sin DT · cargar</p>`}
+                </button>`).join('');
+        }
+
+        function abrirModalClubDT(id) {
+            clubDTId = id;
+            const c = clubesDT.find(x => x.equipo_id === id);
+            if (!c) return;
+            document.getElementById('club-dt-escudo').innerHTML = escudoHTML(c, 'w-16 h-16 shrink-0');
+            document.getElementById('club-dt-nombre').textContent = c.nombre;
+            document.getElementById('club-dt-actual').textContent = c.dt_actual
+                ? `DT actual: ${c.dt_actual.nombre} (desde ${dtFecha(c.dt_actual.desde)})`
+                : 'Todavía no tiene DT cargado';
+            document.getElementById('club-dt-form-titulo').textContent = c.dt_actual ? 'Cambiar de DT (echaron al actual o renunció)' : 'Poner el DT actual';
+            document.getElementById('club-dt-ayuda').textContent = c.dt_actual
+                ? `Al guardar, ${c.dt_actual.nombre} queda en el historial con fecha de salida y el nuevo pasa a ser el DT actual.`
+                : 'Podés cambiarlo más adelante: el anterior queda guardado en el historial.';
+            document.getElementById('club-dt-input').value = '';
+            document.getElementById('club-dt-fecha').value = dtHoy();
+            document.getElementById('club-escudo-url').value = (c.escudo && c.escudo.startsWith('http')) ? c.escudo : '';
+            document.getElementById('modal-club-dt').classList.remove('hidden');
+            cargarHistorialDT();
+        }
+
+        function cerrarModalClubDT() {
+            document.getElementById('modal-club-dt').classList.add('hidden');
+            clubDTId = null;
+        }
+
+        async function cargarHistorialDT() {
+            const cont = document.getElementById('club-dt-historial');
+            const id = clubDTId;
+            const filas = await apiRequest(`${API_URL}/dts/clubes/${id}/historial`);
+            if (id !== clubDTId) return;
+            if (!filas.length) { cont.innerHTML = '<p class="text-xs text-slate-500">Sin historial todavía.</p>'; return; }
+            cont.innerHTML = filas.map(d => `
+                <div class="flex items-center justify-between gap-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2">
+                    <div class="min-w-0"><p class="text-sm text-ink truncate">${dtEsc(d.nombre)}${d.hasta ? '' : ' <span class="text-[10px] text-emerald-400 font-bold ml-1">ACTUAL</span>'}</p>
+                        <p class="text-[11px] text-slate-500">${dtFecha(d.desde)} – ${d.hasta ? dtFecha(d.hasta) : 'hoy'}</p></div>
+                    <div class="flex gap-1 shrink-0">
+                        <button onclick="corregirDT(${d.id}, this.dataset.n)" data-n="${dtEsc(d.nombre)}" class="text-slate-400 hover:text-ink px-2" title="Corregir nombre"><i class="fa-solid fa-pen text-xs"></i></button>
+                        <button onclick="borrarDT(${d.id})" class="text-slate-400 hover:text-red-400 px-2" title="Borrar"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                    </div>
+                </div>`).join('');
+        }
+
+        async function refrescarClubDT() {
+            await cargarClubesDT();
+            if (clubDTId) abrirModalClubDT(clubDTId);
+        }
+
+        async function guardarDT(e) {
+            e.preventDefault();
+            await apiRequest(`${API_URL}/dts/clubes/${clubDTId}/dt`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nombre: document.getElementById('club-dt-input').value,
+                    desde: document.getElementById('club-dt-fecha').value
+                })
+            });
+            await refrescarClubDT();
+        }
+
+        async function corregirDT(id, nombreActual) {
+            const nuevo = prompt('Nombre correcto del DT:', nombreActual);
+            if (nuevo === null || !nuevo.trim()) return;
+            await apiRequest(`${API_URL}/dts/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre: nuevo })
+            });
+            await refrescarClubDT();
+        }
+
+        async function borrarDT(id) {
+            if (!confirmarBorrado('¿Borrar este DT del historial? Si era el actual, vuelve a ser el actual el anterior.')) return;
+            await apiRequest(`${API_URL}/dts/${id}`, { method: 'DELETE' });
+            await refrescarClubDT();
+        }
+
+        async function enviarEscudo(valor) {
+            await apiRequest(`${API_URL}/dts/clubes/${clubDTId}/escudo`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ escudo: valor })
+            });
+            await refrescarClubDT();
+        }
+
+        function guardarEscudoURL() {
+            const url = document.getElementById('club-escudo-url').value.trim();
+            if (!url) return alert('Pegá el link de la imagen del escudo.');
+            enviarEscudo(url);
+        }
+
+        function quitarEscudo() { enviarEscudo(''); }
+
+        // Achica la imagen a 128px máx. antes de guardarla (queda en unos pocos KB).
+        function subirEscudo(ev) {
+            const file = ev.target.files[0];
+            ev.target.value = '';
+            if (!file) return;
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                const k = Math.min(1, 128 / Math.max(img.width, img.height));
+                const cv = document.createElement('canvas');
+                cv.width = Math.max(1, Math.round(img.width * k));
+                cv.height = Math.max(1, Math.round(img.height * k));
+                cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+                URL.revokeObjectURL(url);
+                enviarEscudo(cv.toDataURL('image/png'));
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); alert('No se pudo leer esa imagen.'); };
+            img.src = url;
         }
 
         aplicarTema(document.documentElement.dataset.theme);

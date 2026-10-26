@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, UniqueConstraint, Index, func
+from sqlalchemy import Column, Integer, String, Text, Date, Boolean, ForeignKey, UniqueConstraint, Index, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -8,6 +8,35 @@ class Equipo(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100), unique=True, index=True, nullable=False)
+
+    # Datos extra del club (pestaña DTs). Se borran junto con el club.
+    dts = relationship("DT", back_populates="equipo", cascade="all, delete-orphan")
+    escudo_rel = relationship("EquipoEscudo", uselist=False, cascade="all, delete-orphan")
+
+
+class EquipoEscudo(Base):
+    """Escudo de un club: una URL o una imagen chica en base64 (data URL).
+    Va en la base y no en disco porque el disco de Render es efímero."""
+    __tablename__ = "equipo_escudos"
+
+    equipo_id = Column(Integer, ForeignKey("equipos.id"), primary_key=True)
+    escudo = Column(Text, nullable=False)
+
+
+class DT(Base):
+    """Historial de directores técnicos de un club.
+    El DT ACTUAL es el que tiene hasta = NULL (uno solo por club).
+    Cuando lo echan y llega otro, al anterior se le pone 'hasta' y se crea
+    una fila nueva: así queda toda la historia sin perder nada."""
+    __tablename__ = "directores_tecnicos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    equipo_id = Column(Integer, ForeignKey("equipos.id"), nullable=False, index=True)
+    nombre = Column(String(150), nullable=False)
+    desde = Column(Date, nullable=False)
+    hasta = Column(Date, nullable=True)
+
+    equipo = relationship("Equipo", back_populates="dts")
 
 
 class Estadio(Base):
