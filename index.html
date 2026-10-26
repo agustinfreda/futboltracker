@@ -101,7 +101,7 @@
                 </div>
             </div>
             <div class="card !p-4">
-                <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3"><div><label class="block text-[11px] text-slate-400 mb-1">Competición</label><select id="filtro-competicion" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Edición</label><select id="filtro-temporada" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Año</label><select id="filtro-anio" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Instancia</label><select id="filtro-instancia" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Equipo</label><select id="filtro-equipo" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Estadio</label><select id="filtro-estadio" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Desde</label><input type="date" id="filtro-desde" onchange="aplicarFiltrosPartidos()" class="fld"></div><div><label class="block text-[11px] text-slate-400 mb-1">Hasta</label><input type="date" id="filtro-hasta" onchange="aplicarFiltrosPartidos()" class="fld"></div><div><label class="block text-[11px] text-slate-400 mb-1">Orden</label><select id="filtro-orden" onchange="aplicarFiltrosPartidos()" class="fld"><option value="reciente">Más recientes primero</option><option value="antiguo">Más antiguos primero</option></select></div></div>
+                <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3"><div><label class="block text-[11px] text-slate-400 mb-1">Competición</label><select id="filtro-competicion" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Edición</label><select id="filtro-temporada" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Año</label><select id="filtro-anio" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Instancia</label><select id="filtro-instancia" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Equipo</label><select id="filtro-equipo" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Estadio</label><select id="filtro-estadio" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div class="relative"><label class="block text-[11px] text-slate-400 mb-1">DT</label><input type="text" id="filtro-dt" oninput="escribirDTFiltro(this.value)" onfocus="sugerirDTFiltro(this.value)" placeholder="Buscar DT..." autocomplete="off" class="fld"><div id="desplegable-dt-filtro" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-48 overflow-y-auto hidden z-20 shadow-2xl"></div></div><div><label class="block text-[11px] text-slate-400 mb-1">Desde</label><input type="date" id="filtro-desde" onchange="aplicarFiltrosPartidos()" class="fld"></div><div><label class="block text-[11px] text-slate-400 mb-1">Hasta</label><input type="date" id="filtro-hasta" onchange="aplicarFiltrosPartidos()" class="fld"></div><div><label class="block text-[11px] text-slate-400 mb-1">Orden</label><select id="filtro-orden" onchange="aplicarFiltrosPartidos()" class="fld"><option value="reciente">Más recientes primero</option><option value="antiguo">Más antiguos primero</option></select></div></div>
                 <div class="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-700/60">
                     <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" id="filtro-penales" onchange="aplicarFiltrosPartidos()" class="rounded border-slate-600 text-emerald-500 focus:ring-emerald-500"> Solo definidos por penales</label>
                     <button onclick="limpiarFiltrosPartidos()" id="btn-limpiar-partidos" class="text-xs text-slate-400 hover:text-ink underline">Limpiar filtros</button>
@@ -1202,23 +1202,38 @@
         // --- PARTIDOS VISTOS ---
         let anioOpcionesCache = [];
         let estadiosMemoria = [];
-        const FILTROS_PARTIDOS = { competicion: 'filtro-competicion', temporada: 'filtro-temporada', anio: 'filtro-anio', instancia: 'filtro-instancia', equipo: 'filtro-equipo', estadio: 'filtro-estadio', desde: 'filtro-desde', hasta: 'filtro-hasta' };
+        const FILTROS_PARTIDOS = { competicion: 'filtro-competicion', temporada: 'filtro-temporada', anio: 'filtro-anio', instancia: 'filtro-instancia', equipo: 'filtro-equipo', estadio: 'filtro-estadio', dt: 'filtro-dt', desde: 'filtro-desde', hasta: 'filtro-hasta' };
 
         async function cargarPartidos() {
-            await Promise.all([cargarEquipos(), cargarCompeticiones(), cargarInstancias()]);
-            try { estadiosMemoria = await (await fetch(`${API_URL}/estadios/`)).json(); } catch (e) { estadiosMemoria = []; }
-            try { anioOpcionesCache = await (await fetch(`${API_URL}/partidos/anios-disponibles`)).json(); } catch (e) { anioOpcionesCache = []; }
-            poblarFiltrosPartidos();
-            await recargarPartidos();
+            // Antes esto eran 4 viajes seguidos al servidor (listas -> estadios -> años -> partidos
+            // -> conteo) y los partidos recién salían al final. Ahora todo sale a la vez y los
+            // partidos se pintan apenas llegan, sin esperar a las listas de los filtros.
+            if (partidosMemoria.length) renderPartidos(partidosMemoria); // al volver a la pestaña, se ve al instante
+            const listas = Promise.all([
+                cargarEquipos(), cargarCompeticiones(), cargarInstancias(),
+                fetch(`${API_URL}/estadios/`).then(r => r.json()).then(d => { estadiosMemoria = d; }).catch(() => { estadiosMemoria = []; }),
+                fetch(`${API_URL}/partidos/anios-disponibles`).then(r => r.json()).then(d => { anioOpcionesCache = d; }).catch(() => { anioOpcionesCache = []; })
+            ]).then(poblarFiltrosPartidos);
+            await Promise.all([recargarPartidos(), listas]);
         }
 
+        let seqPartidos = 0;
         async function recargarPartidos() {
-            partidosMemoria = await fetchPaginaPartidos(0);
+            const seq = ++seqPartidos; // si el usuario cambia un filtro mientras carga, se descarta la respuesta vieja
+            // El conteo arranca junto con la página de partidos, no después.
+            const pConteo = fetch(`${API_URL}/partidos/conteo?${paramsPartidos()}`)
+                .then(r => r.json()).then(d => d.total).catch(() => null);
+            const pagina = await fetchPaginaPartidos(0);
+            if (seq !== seqPartidos) return;
+            partidosMemoria = pagina;
             partidosSkip = partidosMemoria.length;
             partidosHayMas = partidosMemoria.length === PARTIDOS_PAGE_SIZE;
             renderPartidos(partidosMemoria);
             actualizarBotonCargarMasPartidos();
-            actualizarConteoPartidos();
+            const total = await pConteo;
+            if (seq !== seqPartidos) return;
+            if (total !== null) totalPartidosFiltrados = total;
+            actualizarConteoPartidos(true);
         }
 
         async function cargarMasPartidos() {
@@ -1398,6 +1413,53 @@
                 if (lista.includes(previo)) sel.value = previo;
             });
         }
+
+        // --- Filtro por DT (buscador con sugerencias de los DTs registrados alguna vez) ---
+        let dtFiltroSeq = 0, dtFiltroTimer = null;
+        function escribirDTFiltro(texto) {
+            sugerirDTFiltro(texto);
+            aplicarFiltrosPartidos(); // filtra mientras escribís; elegir una sugerencia completa el nombre
+        }
+        function sugerirDTFiltro(texto) {
+            clearTimeout(dtFiltroTimer);
+            dtFiltroTimer = setTimeout(async () => {
+                const seq = ++dtFiltroSeq;
+                const desp = document.getElementById('desplegable-dt-filtro');
+                let lista;
+                try {
+                    lista = await (await fetch(`${API_URL}/dts/buscar?nombre=${encodeURIComponent((texto || '').trim())}`)).json();
+                } catch (e) { return; }
+                if (seq !== dtFiltroSeq) return;
+                desp.innerHTML = '';
+                if (!lista.length) {
+                    const vacio = document.createElement('div');
+                    vacio.className = 'p-3 text-xs text-slate-400 text-center';
+                    vacio.textContent = 'No hay DTs registrados con ese nombre.';
+                    desp.appendChild(vacio);
+                } else {
+                    lista.forEach(d => {
+                        const fila = document.createElement('div');
+                        fila.className = 'px-3 py-2 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs text-ink';
+                        fila.textContent = d.nombre;
+                        const clubes = document.createElement('span');
+                        clubes.className = 'text-slate-500 ml-1.5';
+                        clubes.textContent = '· ' + d.clubes.join(', ');
+                        fila.appendChild(clubes);
+                        fila.addEventListener('click', () => {
+                            document.getElementById('filtro-dt').value = d.nombre;
+                            desp.classList.add('hidden');
+                            aplicarFiltrosPartidos();
+                        });
+                        desp.appendChild(fila);
+                    });
+                }
+                desp.classList.remove('hidden');
+            }, 150);
+        }
+        document.addEventListener('click', (ev) => {
+            const input = document.getElementById('filtro-dt'), desp = document.getElementById('desplegable-dt-filtro');
+            if (input && desp && ev.target !== input && !desp.contains(ev.target)) desp.classList.add('hidden');
+        });
 
         let filtroPartidosTimeout = null;
         function aplicarFiltrosPartidos() {

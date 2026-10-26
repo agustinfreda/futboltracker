@@ -12,11 +12,12 @@ import schemas
 from database import engine, get_db
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import extract, func, inspect, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 # Crear tablas en BD si no existen
 models.Base.metadata.create_all(bind=engine)
@@ -55,6 +56,10 @@ app.add_middleware(
 )
 
 app.include_router(dts.router)
+
+# Comprime las respuestas (JSON de partidos, index.html): bajan mucho de tamaño
+# y llegan más rápido, sobre todo desde el celular.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # ---------------------------------------------------------
 # MONTAR ARCHIVOS ESTÁTICOS Y SERVIR EL INDEX.HTML
@@ -574,8 +579,10 @@ def _validar_penales(local: str, visitante: str, penales: bool, penales_ganador:
     )
 
 
-def _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales):
+def _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales, dt_cond=None):
     low = lambda c, v: func.lower(c) == v.strip().lower()
+    if dt_cond is not None:
+        query = query.filter(dt_cond)
     if competicion:
         query = query.filter(low(models.Partido.competicion, competicion))
     if temporada:
@@ -619,13 +626,15 @@ def obtener_partidos(
     desde: Optional[date] = None,
     hasta: Optional[date] = None,
     penales: bool = False,
+    dt: Optional[str] = None,
     orden: str = Query("reciente", pattern="^(reciente|antiguo)$"),
     db: Session = Depends(get_db),
 ):
     query = db.query(models.Partido).options(
-        selectinload(models.Partido.goles).selectinload(models.Gol.jugador)
+        selectinload(models.Partido.goles).joinedload(models.Gol.jugador)
     )
-    query = _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales)
+    dt_cond = dts.condicion_dt(db, dt) if dt and dt.strip() else None
+    query = _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales, dt_cond)
     fecha = models.Partido.fecha_partido
     orden_cols = (fecha.desc(), models.Partido.id.desc()) if orden == "reciente" else (fecha.asc(), models.Partido.id.asc())
     resultado = query.order_by(*orden_cols).offset(skip).limit(limit).all()
@@ -638,9 +647,10 @@ def conteo_partidos(
     competicion: Optional[str] = None, temporada: Optional[str] = None, anio: Optional[int] = None,
     equipo: Optional[str] = None, q: Optional[str] = None, instancia: Optional[str] = None,
     estadio: Optional[str] = None, desde: Optional[date] = None, hasta: Optional[date] = None,
-    penales: bool = False, db: Session = Depends(get_db),
+    penales: bool = False, dt: Optional[str] = None, db: Session = Depends(get_db),
 ):
-    query = _filtrar_partidos(db.query(models.Partido), competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales)
+    dt_cond = dts.condicion_dt(db, dt) if dt and dt.strip() else None
+    query = _filtrar_partidos(db.query(models.Partido), competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales, dt_cond)
     return {"total": query.count()}
 
 
@@ -1083,7 +1093,7 @@ def _marcador(p: "models.Partido"):
 
 def _cargar_partidos(db: Session, competicion: Optional[str] = None, anio: Optional[int] = None):
     q = db.query(models.Partido).options(
-        selectinload(models.Partido.goles).selectinload(models.Gol.jugador)
+        selectinload(models.Partido.goles).joinedload(models.Gol.jugador)
     )
     q = _filtrar_por_partido(q, competicion, anio)
     return q.order_by(models.Partido.fecha_partido.desc(), models.Partido.id.desc()).all()

@@ -10,9 +10,9 @@ from typing import List, Optional
 
 import models
 from database import get_db
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import and_, false, func, or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/dts", tags=["DTs"])
@@ -79,6 +79,48 @@ def anotar_dts(db: Session, partidos) -> None:
     for p in partidos:
         p.dt_local = dt_en_fecha(idx, p.equipo_local, p.fecha_partido)
         p.dt_visitante = dt_en_fecha(idx, p.equipo_visitante, p.fecha_partido)
+
+
+def condicion_dt(db: Session, texto: str):
+    """Condición SQL para filtrar partidos por DT: partidos de los clubes que
+    ese DT dirigió, pero SOLO en las fechas en que estaba al mando. El texto
+    puede ser parcial ('gallardo' encuentra 'Marcelo Gallardo')."""
+    patron = f"%{texto.strip().lower()}%"
+    filas = (
+        db.query(models.DT.desde, models.DT.hasta, models.Equipo.nombre)
+        .join(models.Equipo, models.Equipo.id == models.DT.equipo_id)
+        .filter(func.lower(models.DT.nombre).like(patron))
+        .all()
+    )
+    if not filas:
+        return false()  # ningún DT con ese nombre -> ningún partido
+    fecha = models.Partido.fecha_partido
+    conds = []
+    for desde, hasta, club in filas:
+        c = club.strip().lower()
+        rango = [fecha >= desde] + ([fecha < hasta] if hasta else [])
+        conds.append(and_(func.lower(models.Partido.equipo_local) == c, *rango))
+        conds.append(and_(func.lower(models.Partido.equipo_visitante) == c, *rango))
+    return or_(*conds)
+
+
+@router.get("/buscar")
+def buscar_dts(nombre: str = Query("", max_length=150), db: Session = Depends(get_db)):
+    """Autocompletado: DTs registrados alguna vez (actuales y anteriores),
+    sin repetir, con los clubes que dirigieron. Con el texto vacío devuelve
+    los primeros por orden alfabético."""
+    q = db.query(models.DT.nombre, models.Equipo.nombre).join(
+        models.Equipo, models.Equipo.id == models.DT.equipo_id
+    )
+    texto = nombre.strip().lower()
+    if texto:
+        q = q.filter(func.lower(models.DT.nombre).like(f"%{texto}%"))
+    agrupados = {}
+    for dt_nombre, club in q.all():
+        item = agrupados.setdefault(dt_nombre.strip().lower(), {"nombre": dt_nombre, "clubes": set()})
+        item["clubes"].add(club)
+    lista = sorted(agrupados.values(), key=lambda x: x["nombre"].lower())[:10]
+    return [{"nombre": i["nombre"], "clubes": sorted(i["clubes"])} for i in lista]
 
 
 @router.get("/clubes")
