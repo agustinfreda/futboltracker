@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import extract, func, inspect, text
+from sqlalchemy import extract, func, inspect, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -88,6 +88,22 @@ def _asegurar_columna_partido_ida_id():
 
 
 _asegurar_columna_partido_ida_id()
+
+
+def _asegurar_columna_apodo_jugadores():
+    """Agrega 'apodo' a 'jugadores' si todavía no está (create_all() no toca
+    tablas que ya existen, como la de Render). Idempotente. Los jugadores ya
+    cargados quedan con apodo = NULL (sin apodo)."""
+    inspector = inspect(engine)
+    if "jugadores" not in inspector.get_table_names():
+        return
+    columnas = [c["name"] for c in inspector.get_columns("jugadores")]
+    if "apodo" not in columnas:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE jugadores ADD COLUMN apodo VARCHAR(100)"))
+
+
+_asegurar_columna_apodo_jugadores()
 
 app = FastAPI(title="Futbol Tracker API")
 
@@ -501,12 +517,27 @@ def _parse_fecha(txt: Optional[str]) -> Optional[date]:
     return None
 
 
+def _limpiar_apodo(apodo: Optional[str]) -> Optional[str]:
+    """Apodo sin espacios de más y sin comillas alrededor (si alguien escribe
+    "Jagger" con comillas, se guarda Jagger). Vacío = sin apodo."""
+    limpio = (apodo or "").strip().strip("\"'“”‘’«»").strip()
+    if len(limpio) > 100:
+        raise HTTPException(status_code=400, detail="El apodo es demasiado largo (máximo 100 caracteres)")
+    return limpio or None
+
+
+def _nombre_visible(nombre: str, apodo: Optional[str]) -> str:
+    """Nombre para mostrar en rankings: Gonzalo Martínez “Pity”."""
+    return f"{nombre} “{apodo}”" if apodo else nombre
+
+
 def _serializar_jugadores(jugadores: List[models.Jugador], db: Session) -> List[dict]:
     mapa_equipos = _mapa_equipos_por_jugador([j.id for j in jugadores], db)
     return [
         {
             "id": j.id,
             "nombre": j.nombre,
+            "apodo": j.apodo,
             "nacionalidad": j.nacionalidad,
             "posicion": j.posicion,
             "fecha_nacimiento": j.fecha_nacimiento,
@@ -537,7 +568,8 @@ def _query_jugadores(db, equipo, q, posicion, nacionalidad, solo_con_goles):
             db.query(models.Gol.jugador_id).filter(func.lower(models.Gol.equipo) == equipo.strip().lower())
         ))
     if q:
-        query = query.filter(models.Jugador.nombre.ilike(f"%{q.strip()}%"))
+        patron = f"%{q.strip()}%"
+        query = query.filter(or_(models.Jugador.nombre.ilike(patron), models.Jugador.apodo.ilike(patron)))
     if posicion:
         query = query.filter(func.lower(models.Jugador.posicion) == posicion.strip().lower())
     if nacionalidad:
@@ -599,8 +631,8 @@ def opciones_filtros_jugadores(db: Session = Depends(get_db)):
 @app.get("/jugadores/buscar/", response_model=List[schemas.JugadorResponse])
 def buscar_jugadores(nombre: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     jugadores = db.query(models.Jugador).filter(
-        models.Jugador.nombre.ilike(f"%{nombre}%")
-    ).limit(10).all()
+        or_(models.Jugador.nombre.ilike(f"%{nombre}%"), models.Jugador.apodo.ilike(f"%{nombre}%"))
+    ).order_by(models.Jugador.nombre).limit(10).all()
     return _serializar_jugadores(jugadores, db)
 
 
@@ -624,6 +656,7 @@ def crear_jugador(jugador: schemas.JugadorCreate, db: Session = Depends(get_db))
     _validar_fecha_nacimiento(jugador.fecha_nacimiento)
     datos = jugador.model_dump()
     datos["nombre"] = nombre_clean
+    datos["apodo"] = _limpiar_apodo(jugador.apodo)
     if datos.get("fecha_nacimiento"):
         datos["edad"] = None  # la edad se calcula desde la fecha
     nuevo_jugador = models.Jugador(**datos)
@@ -707,6 +740,7 @@ def actualizar_jugador(jugador_id: int, datos: schemas.JugadorUpdate, db: Sessio
         raise HTTPException(status_code=400, detail=f"Ya existe otro jugador llamado '{nombre_clean}'")
 
     jugador.nombre = nombre_clean
+    jugador.apodo = _limpiar_apodo(datos.apodo)
     jugador.nacionalidad = datos.nacionalidad
     jugador.posicion = datos.posicion
     _validar_fecha_nacimiento(datos.fecha_nacimiento)
@@ -1250,6 +1284,7 @@ def top_goleadores(
             models.Jugador.nombre,
             models.Jugador.nacionalidad,
             func.count(models.Gol.id).label("total_goles"),
+            models.Jugador.apodo,
         )
         .join(models.Gol, models.Jugador.id == models.Gol.jugador_id)
         .join(models.Partido, models.Gol.partido_id == models.Partido.id)
@@ -1261,7 +1296,10 @@ def top_goleadores(
         .limit(limit)
         .all()
     )
-    return [{"nombre": r[0], "nacionalidad": r[1], "total_goles": r[2]} for r in resultados]
+    return [
+        {"nombre": _nombre_visible(r[0], r[3]), "apodo": r[3], "nacionalidad": r[1], "total_goles": r[2]}
+        for r in resultados
+    ]
 
 
 @app.get("/estadisticas/top-equipos-goles")
@@ -1383,14 +1421,16 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         dts.anotar_dts(db, [ultimo_partido])
 
     filas_goleadores = (
-        db.query(models.Jugador.nombre, func.count(models.Gol.id).label("total"))
+        db.query(models.Jugador.nombre, func.count(models.Gol.id).label("total"), models.Jugador.apodo)
         .join(models.Gol, models.Jugador.id == models.Gol.jugador_id)
         .group_by(models.Jugador.id)
         .order_by(func.count(models.Gol.id).desc())
         .limit(3)
         .all()
     )
-    top_goleadores = [{"nombre": nombre, "goles": total} for nombre, total in filas_goleadores]
+    top_goleadores = [
+        {"nombre": _nombre_visible(nombre, apodo), "goles": total} for nombre, total, apodo in filas_goleadores
+    ]
 
     return schemas.DashboardResponse(
         total_partidos=total_partidos,
@@ -1501,7 +1541,7 @@ def _metricas(partidos):
             if c >= 2 and (mejor is None or c > mejor["goles"]):
                 mejor = {"jid": jid, "goles": c, "partido": etiqueta}
         for g in p.goles:
-            nombres[g.jugador_id] = g.jugador.nombre
+            nombres[g.jugador_id] = _nombre_visible(g.jugador.nombre, g.jugador.apodo)
             nac[g.jugador.nacionalidad or "Sin dato"] += 1
             pos[g.jugador.posicion or "Sin dato"] += 1
             tramos[_tramo_minuto(g.minuto)] += 1
@@ -1729,14 +1769,14 @@ def exportar_csv(tipo: str = Query("completo", pattern="^(completo|partidos|juga
         equipos = _mapa_equipos_por_jugador([j.id for j in jugadores], db)
         goles = dict(db.query(models.Gol.jugador_id, func.count(models.Gol.id)).group_by(models.Gol.jugador_id).all())
         filas = [
-            [j.id, j.nombre, j.nacionalidad or "", j.posicion or "",
+            [j.id, j.nombre, j.apodo or "", j.nacionalidad or "", j.posicion or "",
              j.fecha_nacimiento.isoformat() if j.fecha_nacimiento else "",
              _calcular_edad(j) if _calcular_edad(j) is not None else "",
              " / ".join(equipos.get(j.id, [])), goles.get(j.id, 0)]
             for j in jugadores
         ]
         return _csv_response(
-            "jugadores", ["id", "nombre", "nacionalidad", "posicion", "fecha_nacimiento", "edad", "equipos", "goles_totales"], filas
+            "jugadores", ["id", "nombre", "apodo", "nacionalidad", "posicion", "fecha_nacimiento", "edad", "equipos", "goles_totales"], filas
         )
 
     partidos = list(reversed(_cargar_partidos(db)))  # cronológico

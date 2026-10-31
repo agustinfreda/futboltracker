@@ -78,6 +78,9 @@ class Jugador(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(150), index=True, nullable=False)
+    # Apodo opcional (ej. nombre "Facundo Herrera", apodo "Jagger"). Es solo
+    # un dato extra para mostrar y buscar: la identidad sigue siendo el nombre.
+    apodo = Column(String(100), nullable=True)
     nacionalidad = Column(String(100), nullable=True)
     posicion = Column(String(50), nullable=True)
     # Fecha de nacimiento: es el dato real. La edad se CALCULA a partir de

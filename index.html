@@ -128,8 +128,8 @@
                 </div>
             </div>
             <div id="wrap-form-jugador" class="card hidden">
-                <form id="form-jugador" onsubmit="guardarJugador(event)" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <div><label class="block text-xs font-medium text-slate-400 mb-1">Nombre completo</label><input type="text" id="j-nombre" placeholder="Ej. Edinson Cavani" required class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label><input type="text" id="j-nacionalidad" placeholder="Ej. Uruguaya"  class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Posición</label><input type="text" id="j-posicion" placeholder="Ej. Delantero"  class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Fecha de nacimiento</label><input type="date" id="j-fecha-nac" class="fld !py-2 !text-sm"></div>
+                <form id="form-jugador" onsubmit="guardarJugador(event)" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                    <div><label class="block text-xs font-medium text-slate-400 mb-1">Nombre completo</label><input type="text" id="j-nombre" placeholder="Ej. Edinson Cavani" required class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Apodo (opcional)</label><input type="text" id="j-apodo" placeholder="Ej. Matador" class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label><input type="text" id="j-nacionalidad" placeholder="Ej. Uruguaya"  class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Posición</label><input type="text" id="j-posicion" placeholder="Ej. Delantero"  class="fld !py-2 !text-sm"></div><div><label class="block text-xs font-medium text-slate-400 mb-1">Fecha de nacimiento</label><input type="date" id="j-fecha-nac" class="fld !py-2 !text-sm"></div>
                     <button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">Guardar jugador</button>
                 </form>
             </div>
@@ -540,7 +540,7 @@
 
             <div class="relative">
                 <label class="block text-xs font-medium text-slate-400 mb-1">Buscar Jugador Autor del Gol</label>
-                <input type="text" id="gol-buscar-jugador" oninput="buscarJugadorAuto(this.value)" placeholder="Escribí el nombre del jugador..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                <input type="text" id="gol-buscar-jugador" oninput="buscarJugadorAuto(this.value)" placeholder="Escribí el nombre o apodo del jugador..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
                 <input type="hidden" id="gol-jugador-id">
                 
                 <div id="desplegable-jugadores" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-48 overflow-y-auto hidden z-10 shadow-2xl"></div>
@@ -596,6 +596,10 @@
                     <label class="block text-xs font-medium text-slate-400 mb-1">Nombre Completo</label>
                     <input type="text" id="pop-j-nombre" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Apodo (opcional)</label>
+                    <input type="text" id="pop-j-apodo" placeholder="Ej. Pity" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Fecha de nacimiento</label>
@@ -635,6 +639,11 @@
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">Nombre Completo</label>
                     <input type="text" id="edit-j-nombre" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Apodo (opcional)</label>
+                    <input type="text" id="edit-j-apodo" placeholder="Ej. Jagger" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                    <p class="text-[11px] text-slate-500 mt-1">Sin comillas: se muestra como Facundo Herrera “Jagger”. Dejalo vacío para quitarlo.</p>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -743,6 +752,10 @@
             if (res.status === 204) return null;
             return res.json();
         }
+
+        // Nombre para mostrar: Gonzalo Martínez “Pity” (si tiene apodo). Para cambiar
+        // cómo se muestra el apodo en toda la app, basta con tocar esta función.
+        const nombreJug = (j) => j.apodo ? `${j.nombre} “${j.apodo}”` : j.nombre;
 
         // JSON listo para ir dentro de onclick='...': escapa & y ' (ej. "Newell's Old Boys").
         const attrJSON = (obj) => JSON.stringify(obj).replace(/&/g, '&amp;').replace(/'/g, '&#39;');
@@ -1531,7 +1544,7 @@
                         <div class="flex items-center justify-between bg-slate-900 px-2.5 py-1 rounded text-[11px]">
                             <div class="truncate pr-2">
                                 <span class="font-bold text-emerald-400">${g.minuto}'</span>
-                                <span class="text-ink font-medium">${g.jugador.nombre}</span>
+                                <span class="text-ink font-medium">${esc(nombreJug(g.jugador))}</span>
                                 <span class="text-slate-500">${g.tipo !== 'JUGADA' ? '· ' + g.tipo : ''}</span>
                             </div>
                             <button onclick="borrarGol(${g.id})" title="Borrar gol" class="text-slate-600 hover:text-red-400 transition-colors shrink-0">
@@ -2046,7 +2059,7 @@
                     ? j.equipos.map(e => `<span class="inline-block bg-slate-900 border border-slate-700 text-emerald-400 text-[11px] px-2 py-0.5 rounded-full mr-1 mb-1">${esc(e)}</span>`).join('')
                     : `<span class="text-slate-500 text-xs italic">Sin goles registrados</span>`;
                 return `<tr class="border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30">
-                    <td class="px-4 py-3"><div class="flex items-center gap-3"><span class="w-9 h-9 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 font-display font-bold flex items-center justify-center shrink-0">${esc(ini)}</span><span class="font-semibold text-ink">${esc(j.nombre)}</span></div></td>
+                    <td class="px-4 py-3"><div class="flex items-center gap-3"><span class="w-9 h-9 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 font-display font-bold flex items-center justify-center shrink-0">${esc(ini)}</span><span class="font-semibold text-ink">${esc(j.nombre)}${j.apodo ? ` <span class="font-normal text-amber-400">“${esc(j.apodo)}”</span>` : ''}</span></div></td>
                     <td class="px-4 py-3">${j.posicion ? `<span class="text-xs bg-slate-900 border border-slate-700 rounded-md px-2 py-0.5">${esc(j.posicion)}</span>` : '-'}</td>
                     <td class="px-4 py-3">${esc(j.nacionalidad || '-')}</td>
                     <td class="px-4 py-3 tabular-nums">${j.edad != null ? '<span title="' + (j.fecha_nacimiento ? 'Nació el ' + j.fecha_nacimiento.split('-').reverse().join('/') : 'Edad aproximada: falta cargar la fecha de nacimiento') + '">' + (j.edad_aproximada ? '~' : '') + j.edad + ' años</span>' : '-'}</td>
@@ -2084,7 +2097,7 @@
         async function guardarJugador(e) {
             e.preventDefault();
             const val = id => document.getElementById(id).value;
-            const data = { nombre: val('j-nombre'), nacionalidad: val('j-nacionalidad') || null, posicion: val('j-posicion') || null, fecha_nacimiento: val('j-fecha-nac') || null };
+            const data = { nombre: val('j-nombre'), apodo: val('j-apodo') || null, nacionalidad: val('j-nacionalidad') || null, posicion: val('j-posicion') || null, fecha_nacimiento: val('j-fecha-nac') || null };
             try {
                 await apiRequest(`${API_URL}/jugadores/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             } catch (err) { return; }
@@ -2133,8 +2146,8 @@
                 resultados.forEach(j => {
                     const clubes = (j.equipos && j.equipos.length > 0) ? j.equipos.join(', ') : 'Sin goles aún';
                     desp.innerHTML += `
-                        <div onclick="seleccionarJugadorGol(${j.id}, '${j.nombre}')" class="p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs">
-                            <p class="font-bold text-ink">${j.nombre}</p>
+                        <div onclick='seleccionarJugadorGol(${j.id}, ${attrJSON(nombreJug(j))})' class="p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs">
+                            <p class="font-bold text-ink">${esc(nombreJug(j))}</p>
                             <p class="text-slate-400">${clubes} • ${j.nacionalidad || 'N/A'}</p>
                         </div>
                     `;
@@ -2155,6 +2168,7 @@
         function abrirModalCrearJugadorRapido(nombreSugerido) {
             document.getElementById('desplegable-jugadores').classList.add('hidden');
             document.getElementById('pop-j-nombre').value = nombreSugerido;
+            document.getElementById('pop-j-apodo').value = '';
             document.getElementById('modal-crear-jugador-rapido').classList.remove('hidden');
         }
 
@@ -2166,6 +2180,7 @@
             e.preventDefault();
             const data = {
                 nombre: document.getElementById('pop-j-nombre').value,
+                apodo: document.getElementById('pop-j-apodo').value || null,
                 fecha_nacimiento: document.getElementById('pop-j-fecha-nac').value || null,
                 nacionalidad: document.getElementById('pop-j-nacionalidad').value || null,
                 posicion: document.getElementById('pop-j-posicion').value || null
@@ -2180,7 +2195,7 @@
                 });
             } catch (err) { return; }
 
-            seleccionarJugadorGol(nuevoJugador.id, nuevoJugador.nombre);
+            seleccionarJugadorGol(nuevoJugador.id, nombreJug(nuevoJugador));
             cerrarModalCrearJugadorRapido();
         }
 
@@ -2188,6 +2203,7 @@
         function abrirModalEditarJugador(jugador) {
             document.getElementById('edit-j-id').value = jugador.id;
             document.getElementById('edit-j-nombre').value = jugador.nombre;
+            document.getElementById('edit-j-apodo').value = jugador.apodo || '';
             document.getElementById('edit-j-fecha-nac').value = jugador.fecha_nacimiento || '';
             // Edad vieja (solo respaldo si todavía no hay fecha de nacimiento)
             document.getElementById('edit-j-edad').value = jugador.fecha_nacimiento ? '' : (jugador.edad ?? '');
@@ -2208,6 +2224,7 @@
             const id = document.getElementById('edit-j-id').value;
             const data = {
                 nombre: document.getElementById('edit-j-nombre').value,
+                apodo: document.getElementById('edit-j-apodo').value || null,
                 fecha_nacimiento: document.getElementById('edit-j-fecha-nac').value || null,
                 edad: document.getElementById('edit-j-edad').value ? parseInt(document.getElementById('edit-j-edad').value) : null,
                 nacionalidad: document.getElementById('edit-j-nacionalidad').value || null,
@@ -2361,7 +2378,7 @@
             const gl = p.goles.filter(g => g.equipo.toLowerCase() === l), gv = p.goles.filter(g => g.equipo.toLowerCase() === v);
             const dt = n => n ? `<p class="text-xs muted mt-1.5"><i class="fa-solid fa-user-tie mr-1.5"></i>${esc(n)}</p>` : '';
             const lista = (gs, alin) => gs.length ? `<ul class="mt-3 space-y-0.5 text-xs ${alin}">` + gs.map(g =>
-                `<li><span class="text-emerald-400 font-semibold tabular-nums">${esc(g.minuto)}'</span> ${esc(g.jugador.nombre)}${g.tipo !== 'JUGADA' ? ` <span class="muted">(${esc(g.tipo.toLowerCase())})</span>` : ''}</li>`).join('') + '</ul>' : '';
+                `<li><span class="text-emerald-400 font-semibold tabular-nums">${esc(g.minuto)}'</span> ${esc(nombreJug(g.jugador))}${g.tipo !== 'JUGADA' ? ` <span class="muted">(${esc(g.tipo.toLowerCase())})</span>` : ''}</li>`).join('') + '</ul>' : '';
             const pen = (p.penales && p.penales_ganador && gl.length === gv.length)
                 ? `<p class="text-center text-sm mt-5" style="color:#fbbf24"><i class="fa-solid fa-futbol mr-1.5"></i>${esc(p.penales_ganador)} ganó por penales</p>` : '';
             return `<div class="scoreboard rounded-2xl p-6 md:p-8 h-full">

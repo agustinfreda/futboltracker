@@ -72,6 +72,8 @@ class InstanciaResponse(InstanciaBase):
 # --- SCHEMAS JUGADOR ---
 class JugadorBase(BaseModel):
     nombre: str
+    # Apodo opcional (ej. "Jagger"). Se muestra junto al nombre y se puede buscar.
+    apodo: Optional[str] = None
     nacionalidad: Optional[str] = None
     posicion: Optional[str] = None
     # Dato real que se guarda. La edad se calcula a partir de esta fecha.
