@@ -526,9 +526,31 @@ def _limpiar_apodo(apodo: Optional[str]) -> Optional[str]:
     return limpio or None
 
 
+_PARTICULAS_APELLIDO = {
+    "de", "del", "la", "las", "los", "lo", "di", "da", "das", "do", "dos", "du",
+    "van", "von", "le", "el", "al", "mac", "san", "ter",
+}
+
+
+def _partir_nombre(nombre_completo: str) -> tuple[str, str]:
+    """(nombre, apellido). El apellido es la última palabra más las partículas
+    que la acompañan (Nicolás De La Cruz, Rodrigo De Paul); lo anterior es el
+    nombre. Tiene que dar lo mismo que partirNombre() en index.html."""
+    p = (nombre_completo or "").split()
+    if len(p) <= 1:
+        return "", (p[0] if p else "")
+    i = len(p) - 1
+    while i > 1 and p[i - 1].lower() in _PARTICULAS_APELLIDO:
+        i -= 1
+    return " ".join(p[:i]), " ".join(p[i:])
+
+
 def _nombre_visible(nombre: str, apodo: Optional[str]) -> str:
-    """Nombre para mostrar en rankings: Gonzalo Martínez “Pity”."""
-    return f"{nombre} “{apodo}”" if apodo else nombre
+    """Nombre para mostrar en rankings: Gonzalo “Pity” Martínez."""
+    if not apodo:
+        return nombre
+    n, a = _partir_nombre(nombre)
+    return " ".join(x for x in (n, f"“{apodo}”", a) if x)
 
 
 def _serializar_jugadores(jugadores: List[models.Jugador], db: Session) -> List[dict]:
