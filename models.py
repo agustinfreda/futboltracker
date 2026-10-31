@@ -130,6 +130,12 @@ class Partido(Base):
     penales = Column(Boolean, nullable=False, default=False)
     penales_ganador = Column(String(100), nullable=True)
 
+    # Llave de ida y vuelta: si este partido es la VUELTA de una llave,
+    # acá va el id del partido de IDA. El partido de ida no guarda nada
+    # (se sabe que tiene vuelta porque otro partido apunta a él). Si se
+    # borra la ida, la vuelta queda como partido suelto (SET NULL).
+    partido_ida_id = Column(Integer, ForeignKey("partidos.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Al borrar un partido se borran sus goles automáticamente.
     goles = relationship("Gol", back_populates="partido", cascade="all, delete-orphan")
 

@@ -24,6 +24,10 @@ class EstadioBase(BaseModel):
 class EstadioCreate(EstadioBase):
     pass
 
+# Se usa para editar (PUT) un estadio: mismos campos que al crear.
+class EstadioUpdate(EstadioBase):
+    pass
+
 class EstadioResponse(EstadioBase):
     id: int
 
@@ -141,6 +145,9 @@ class PartidoBase(BaseModel):
     # Nombre del equipo que ganó en penales (tiene que ser el local o el
     # visitante). Solo tiene sentido si penales=True.
     penales_ganador: Optional[str] = None
+    # Si este partido es la VUELTA de una llave de ida y vuelta, id del
+    # partido de ida. None = partido suelto (o partido de ida).
+    partido_ida_id: Optional[int] = None
 
 class PartidoCreate(PartidoBase):
     pass
@@ -156,6 +163,10 @@ class PartidoResponse(PartidoBase):
     # None si todavía no hay un DT cargado para esa fecha.
     dt_local: Optional[str] = None
     dt_visitante: Optional[str] = None
+    # Datos de la llave (ida y vuelta), calculados al responder: rol de este
+    # partido ("ida" o "vuelta"), resultado del otro partido y marcador
+    # global. None si el partido no forma parte de una llave.
+    llave: Optional[dict] = None
 
     class Config:
         from_attributes = True

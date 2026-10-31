@@ -230,9 +230,12 @@
                             <button type="button" onclick="abrirModalCrearCompeticion()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nueva</button>
                         </div>
                     </div>
-                    <select id="p-competicion-select" required onchange="onCambiarCompeticionPartido()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
-                        <!-- Carga dinámica -->
-                    </select>
+                    <div class="relative">
+                        <input type="text" id="p-competicion-buscar" oninput="filtrarCombo('competicion', this.value)" onfocus="abrirCombo('competicion')" placeholder="Elegí o escribí para buscar la competición..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                        <!-- Guarda el valor realmente elegido (vacío = sin elegir) -->
+                        <input type="hidden" id="p-competicion-select">
+                        <div id="desplegable-competicion" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-48 overflow-y-auto hidden z-20 shadow-2xl"></div>
+                    </div>
                 </div>
 
                 <div>
@@ -240,15 +243,13 @@
                         <label class="block text-xs font-medium text-slate-400">Edición / Temporada</label>
                         <div class="flex items-center gap-2">
                             <button type="button" onclick="abrirModalEditarEdicion()" title="Corregir esta edición" class="text-[11px] text-slate-400 hover:text-emerald-400 hover:underline">✎ Editar</button>
-                            <button type="button" onclick="toggleNuevaEdicionPartido()" class="text-[11px] text-emerald-400 hover:underline">＋ Nueva edición</button>
                         </div>
                     </div>
-                    <select id="p-edicion-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
-                        <option value="">Sin edición específica</option>
-                    </select>
-                    <div id="p-nueva-edicion-wrap" class="hidden mt-2 flex gap-2">
-                        <input type="text" id="p-nueva-edicion-input" placeholder="Ej. 2026 o 2025/2026" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
-                        <button type="button" onclick="agregarEdicionPartido()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-3 rounded-lg transition-colors">Agregar</button>
+                    <div class="relative">
+                        <input type="text" id="p-edicion-buscar" oninput="filtrarCombo('edicion', this.value)" onfocus="abrirCombo('edicion')" placeholder="Elegí, escribí una nueva o dejalo vacío (sin edición)..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                        <!-- Guarda el valor realmente elegido (vacío = sin elegir) -->
+                        <input type="hidden" id="p-edicion-select">
+                        <div id="desplegable-edicion" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-48 overflow-y-auto hidden z-20 shadow-2xl"></div>
                     </div>
                 </div>
 
@@ -283,7 +284,10 @@
                 <div>
                     <div class="flex justify-between items-center mb-1">
                         <label class="block text-xs font-medium text-slate-400">Estadio</label>
-                        <button type="button" onclick="abrirModalCrearEstadio()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="editarEstadioElegido()" title="Corregir nombre o ciudad del estadio elegido" class="text-[11px] text-slate-400 hover:text-emerald-400 hover:underline">✎ Editar</button>
+                            <button type="button" onclick="abrirModalCrearEstadio()" class="text-[11px] text-emerald-400 hover:underline">＋ Crear nuevo</button>
+                        </div>
                     </div>
                     <div class="relative">
                         <input type="text" id="p-estadio-buscar" oninput="buscarEstadioAuto(this.value)" onfocus="buscarEstadioAuto(this.value)" placeholder="Buscar estadio por nombre (opcional)..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
@@ -299,13 +303,30 @@
                             <label class="block text-xs font-medium text-slate-400">Instancia</label>
                             <button type="button" onclick="abrirModalCrearInstancia()" class="text-[11px] text-emerald-400 hover:underline">＋ Nueva</button>
                         </div>
-                        <select id="p-instancia-select" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
-                            <!-- Carga dinámica -->
-                        </select>
+                        <div class="relative">
+                        <input type="text" id="p-instancia-buscar" oninput="filtrarCombo('instancia', this.value)" onfocus="abrirCombo('instancia')" placeholder="Elegí o escribí..." autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                        <!-- Guarda el valor realmente elegido (vacío = sin elegir) -->
+                        <input type="hidden" id="p-instancia-select">
+                        <div id="desplegable-instancia" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-48 overflow-y-auto hidden z-20 shadow-2xl"></div>
+                    </div>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Fecha del Partido</label>
                         <input type="date" id="p-fecha" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/60 border border-slate-700/50 rounded-lg p-3">
+                    <label class="flex items-center gap-2 text-xs font-medium text-slate-300">
+                        <input type="checkbox" id="p-vuelta-check" onchange="toggleVuelta()" class="rounded bg-slate-900 border-slate-600 text-emerald-500 focus:ring-emerald-500">
+                        Es el partido de vuelta de una llave (ida y vuelta)
+                    </label>
+                    <div id="p-vuelta-wrap" class="mt-2 hidden">
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Partido de ida</label>
+                        <select id="p-ida-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                            <option value="">Elegí la ida...</option>
+                        </select>
+                        <p id="p-ida-ayuda" class="text-[11px] text-slate-500 mt-1"></p>
                     </div>
                 </div>
 
@@ -374,6 +395,35 @@
                 </div>
                 <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
                     Guardar Estadio
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2b-bis: EDITAR ESTADIO (POPUP) -->
+    <div id="modal-editar-estadio" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalEditarEstadio()" class="absolute top-4 right-4 text-slate-400 hover:text-ink">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-ink flex items-center">
+                <i class="fa-solid fa-pen text-emerald-400 mr-2"></i>Corregir Estadio
+            </h3>
+            <p class="text-[11px] text-slate-500 -mt-2">Si cambiás el nombre, se actualiza también en todos los partidos que ya lo usan.</p>
+
+            <form onsubmit="guardarEstadioEditado(event)" class="space-y-3">
+                <input type="hidden" id="edit-est-id">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Nombre del Estadio</label>
+                    <input type="text" id="edit-est-nombre" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Ciudad (opcional)</label>
+                    <input type="text" id="edit-est-ciudad" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2">
+                    Guardar Corrección
                 </button>
             </form>
         </div>
@@ -694,6 +744,9 @@
             return res.json();
         }
 
+        // JSON listo para ir dentro de onclick='...': escapa & y ' (ej. "Newell's Old Boys").
+        const attrJSON = (obj) => JSON.stringify(obj).replace(/&/g, '&amp;').replace(/'/g, '&#39;');
+
         function confirmarBorrado(mensaje) {
             return confirm(mensaje);
         }
@@ -744,6 +797,7 @@
             document.getElementById(`p-${lado}-buscar`).value = nombre || '';
             document.getElementById(`desplegable-${lado}`).classList.add('hidden');
             togglePenalesGanador();
+            refrescarIda();
         }
 
         // Al hacer foco: si ya hay un club elegido muestra la lista completa;
@@ -758,6 +812,7 @@
         function filtrarEquipoAuto(lado, query) {
             document.getElementById(`p-${lado}-select`).value = '';
             togglePenalesGanador();
+            refrescarIda();
             renderListaEquipos(lado, query);
         }
 
@@ -862,15 +917,29 @@
             } else {
                 resultados.forEach(e => {
                     const fila = document.createElement('div');
-                    fila.className = 'p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs';
+                    fila.className = 'p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs flex items-center justify-between gap-2';
+                    const textos = document.createElement('div');
+                    textos.className = 'min-w-0';
                     const t = document.createElement('p');
                     t.className = 'font-bold text-ink';
                     t.textContent = e.nombre;
                     const c = document.createElement('p');
                     c.className = 'text-slate-400';
                     c.textContent = e.ciudad || 'Ciudad sin especificar';
-                    fila.appendChild(t);
-                    fila.appendChild(c);
+                    textos.appendChild(t);
+                    textos.appendChild(c);
+                    const lapiz = document.createElement('button');
+                    lapiz.type = 'button';
+                    lapiz.title = 'Corregir nombre o ciudad';
+                    lapiz.className = 'text-slate-500 hover:text-emerald-400 shrink-0 px-1';
+                    lapiz.innerHTML = '<i class="fa-solid fa-pen text-[11px]"></i>';
+                    lapiz.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        desp.classList.add('hidden');
+                        abrirModalEditarEstadio(e);
+                    });
+                    fila.appendChild(textos);
+                    fila.appendChild(lapiz);
                     fila.addEventListener('click', () => setEstadioPartido(e.nombre));
                     desp.appendChild(fila);
                 });
@@ -919,6 +988,59 @@
             cerrarModalCrearEstadio();
         }
 
+        // --- EDITAR ESTADIO (nombre / ciudad) ---
+        function abrirModalEditarEstadio(est) {
+            document.getElementById('edit-est-id').value = est.id;
+            document.getElementById('edit-est-nombre').value = est.nombre;
+            document.getElementById('edit-est-ciudad').value = est.ciudad || '';
+            document.getElementById('modal-editar-estadio').dataset.viejo = est.nombre;
+            document.getElementById('modal-editar-estadio').classList.remove('hidden');
+        }
+
+        function cerrarModalEditarEstadio() {
+            document.getElementById('modal-editar-estadio').classList.add('hidden');
+        }
+
+        // Botón "✎ Editar" junto al título: edita el estadio ya elegido en el formulario.
+        async function editarEstadioElegido() {
+            const nombre = document.getElementById('p-estadio-select').value;
+            if (!nombre) {
+                alert('Elegí primero un estadio de la lista (o tocá el lápiz de su fila en el buscador).');
+                return;
+            }
+            let lista = [];
+            try { lista = await (await fetch(`${API_URL}/estadios/`)).json(); } catch (e) { return; }
+            const est = lista.find(x => x.nombre.toLowerCase() === nombre.toLowerCase());
+            if (!est) { alert('No encontré ese estadio.'); return; }
+            abrirModalEditarEstadio(est);
+        }
+
+        async function guardarEstadioEditado(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-est-id').value;
+            const nombre = document.getElementById('edit-est-nombre').value.trim();
+            const ciudad = document.getElementById('edit-est-ciudad').value.trim() || null;
+            if (!nombre) return;
+
+            let actualizado;
+            try {
+                actualizado = await apiRequest(`${API_URL}/estadios/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, ciudad })
+                });
+            } catch (err) { return; }
+
+            // Si el estadio corregido es el que estaba elegido en el formulario, actualizar el texto.
+            const elegido = document.getElementById('p-estadio-select').value;
+            const nombreViejo = (document.getElementById('modal-editar-estadio').dataset.viejo || '');
+            if (elegido && (elegido.toLowerCase() === nombreViejo.toLowerCase() || elegido.toLowerCase() === actualizado.nombre.toLowerCase())) {
+                setEstadioPartido(actualizado.nombre);
+            }
+            cerrarModalEditarEstadio();
+            cargarPartidos(); // refresca tarjetas y la lista de estadios de los filtros
+        }
+
         // --- COMPETICIONES ---
         let competicionesMemoria = [];
         async function cargarCompeticiones(forzarSeleccion) {
@@ -928,21 +1050,129 @@
             } catch (e) {
                 competicionesMemoria = [];
             }
-            // El select del partido guarda solo el nombre (el partido ya tiene
+            // El buscador del partido guarda solo el nombre (el partido ya tiene
             // su propia fecha, de ahí sale el año), así que se muestran nombres
             // únicos aunque haya varias temporadas cargadas con ese nombre.
-            const nombresUnicos = [...new Set(competicionesMemoria.map(c => c.nombre))].sort();
-            const select = document.getElementById('p-competicion-select');
-            // Reconstruir el <select> con innerHTML resetea la selección a la
-            // primera opción, así que guardamos el valor actual antes de
-            // pisarlo y lo restauramos después (o forzamos el que nos pasen).
-            const valorPrevio = forzarSeleccion !== undefined ? forzarSeleccion : select.value;
-            const opciones = nombresUnicos.map(n => `<option value="${n}">${n}</option>`).join('');
-            select.innerHTML = opciones || `<option value="">Sin competiciones registradas</option>`;
-            if (nombresUnicos.includes(valorPrevio)) select.value = valorPrevio;
+            if (forzarSeleccion !== undefined) setCombo('competicion', forzarSeleccion);
         }
 
-        function abrirModalCrearCompeticion() {
+        // ---------- BUSCADORES (competición, edición, instancia) ----------
+        // Mismo esquema que clubes y estadios: el input visible es para
+        // escribir/buscar; lo realmente elegido queda en un input hidden
+        // (#p-competicion-select, #p-edicion-select, #p-instancia-select),
+        // que es el que lee el resto del código.
+        const COMBOS = {
+            competicion: {
+                opciones: () => [...new Set(competicionesMemoria.map(c => c.nombre))].sort(),
+                crear: (t) => abrirModalCrearCompeticion(t),
+                onElegir: () => onCambiarCompeticionPartido(),
+                vacio: 'Todavía no hay competiciones registradas.',
+                noExiste: 'No existe esta competición.'
+            },
+            edicion: {
+                opciones: () => edicionesPartidoMemoria.filter(c => c.temporada).map(c => c.temporada),
+                crear: (t) => crearEdicionDesdeTexto(t),
+                vacio: 'Esta competición todavía no tiene ediciones. Escribí una para crearla.',
+                noExiste: 'No existe esta edición.',
+                requiere: 'competicion', requiereMsg: 'Elegí primero una competición.'
+            },
+            instancia: {
+                opciones: () => instanciasMemoria.map(i => i.nombre),
+                crear: (t) => abrirModalCrearInstancia(t),
+                vacio: 'Todavía no hay instancias registradas.',
+                noExiste: 'No existe esta instancia.'
+            }
+        };
+
+        const valorCombo = (k) => document.getElementById(`p-${k}-select`).value;
+
+        function setCombo(k, valor) {
+            document.getElementById(`p-${k}-select`).value = valor || '';
+            document.getElementById(`p-${k}-buscar`).value = valor || '';
+            document.getElementById(`desplegable-${k}`).classList.add('hidden');
+        }
+
+        function abrirCombo(k) {
+            // Con un valor ya elegido se ve la lista completa; con texto sin elegir, filtrada.
+            renderCombo(k, valorCombo(k) ? '' : document.getElementById(`p-${k}-buscar`).value);
+        }
+
+        function filtrarCombo(k, texto) {
+            // Si se edita el texto, la selección anterior ya no vale.
+            document.getElementById(`p-${k}-select`).value = '';
+            if (k === 'competicion') {
+                // Sin competición elegida no hay ediciones que ofrecer.
+                edicionesPartidoMemoria = [];
+                setCombo('edicion', '');
+                refrescarIda();
+            }
+            renderCombo(k, texto);
+        }
+
+        function renderCombo(k, texto) {
+            const cfg = COMBOS[k];
+            const desp = document.getElementById(`desplegable-${k}`);
+            desp.innerHTML = '';
+            const aviso = (msg, textoACrear) => {
+                const caja = document.createElement('div');
+                caja.className = 'p-3 text-xs text-slate-400 text-center';
+                caja.appendChild(document.createTextNode(msg));
+                if (textoACrear) {
+                    caja.appendChild(document.createElement('br'));
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'mt-2 text-emerald-400 underline font-bold';
+                    btn.textContent = `＋ Crear "${textoACrear}" ahora`;
+                    btn.addEventListener('click', () => { desp.classList.add('hidden'); cfg.crear(textoACrear); });
+                    caja.appendChild(btn);
+                }
+                desp.appendChild(caja);
+                desp.classList.remove('hidden');
+            };
+
+            if (cfg.requiere && !valorCombo(cfg.requiere)) { aviso(cfg.requiereMsg); return; }
+
+            const q = normalizarTexto((texto || '').trim());
+            const elegido = valorCombo(k);
+            const todas = cfg.opciones();
+            const resultados = todas.filter(o => !q || normalizarTexto(o).includes(q));
+
+            if (resultados.length === 0) {
+                aviso(todas.length === 0 ? cfg.vacio : cfg.noExiste, (texto || '').trim());
+                return;
+            }
+            resultados.forEach(o => {
+                const fila = document.createElement('div');
+                fila.className = 'px-3 py-2 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs '
+                    + (o === elegido ? 'text-emerald-400 font-bold' : 'text-ink');
+                fila.textContent = o;
+                fila.addEventListener('click', () => {
+                    setCombo(k, o);
+                    if (cfg.onElegir) cfg.onElegir();
+                });
+                desp.appendChild(fila);
+            });
+            desp.classList.remove('hidden');
+        }
+
+        // Validación al guardar: lo escrito tiene que coincidir con algo elegido.
+        function comboPendiente(k) {
+            return document.getElementById(`p-${k}-buscar`).value.trim() !== '' && !valorCombo(k);
+        }
+
+        // Cerrar los desplegables al hacer click fuera.
+        document.addEventListener('click', (ev) => {
+            Object.keys(COMBOS).forEach(k => {
+                const input = document.getElementById(`p-${k}-buscar`);
+                const desp = document.getElementById(`desplegable-${k}`);
+                if (input && desp && ev.target !== input && !desp.contains(ev.target)) desp.classList.add('hidden');
+            });
+        });
+
+        function abrirModalCrearCompeticion(nombreSugerido) {
+            if (typeof nombreSugerido === 'string') {
+                document.getElementById('pop-comp-nombre').value = nombreSugerido;
+            }
             document.getElementById('modal-crear-competicion').classList.remove('hidden');
         }
 
@@ -968,7 +1198,7 @@
             } catch (err) { return; }
 
             await cargarCompeticiones();
-            document.getElementById('p-competicion-select').value = competicionCreada.nombre;
+            setCombo('competicion', competicionCreada.nombre);
             await onCambiarCompeticionPartido(competicionCreada.temporada);
             cerrarModalCrearCompeticion();
         }
@@ -979,15 +1209,15 @@
         // edición nueva ahí mismo sin salir del formulario.
         let edicionesPartidoMemoria = [];
 
+        let seqEdiciones = 0;
         async function onCambiarCompeticionPartido(valorAConservar) {
-            const nombre = document.getElementById('p-competicion-select').value;
-            const select = document.getElementById('p-edicion-select');
-            document.getElementById('p-nueva-edicion-wrap').classList.add('hidden');
-            document.getElementById('p-nueva-edicion-input').value = '';
+            const seq = ++seqEdiciones; // si llegan dos cargas seguidas, solo vale la última
+            const nombre = valorCombo('competicion');
 
             if (!nombre) {
                 edicionesPartidoMemoria = [];
-                select.innerHTML = `<option value="">Sin edición específica</option>`;
+                setCombo('edicion', '');
+                refrescarIda();
                 return;
             }
 
@@ -997,36 +1227,29 @@
             } catch (e) {
                 edicionesPartidoMemoria = [];
             }
+            if (seq !== seqEdiciones) return;
 
-            // Las ediciones con temporada cargada van primero (más reciente
-            // primero, ya vienen así del backend); "Sin edición específica"
-            // queda al final para no taparlas por defecto.
-            const opciones = edicionesPartidoMemoria
-                .filter(c => c.temporada)
-                .map(c => `<option value="${c.temporada}">${c.temporada}</option>`)
-                .join('');
-            select.innerHTML = opciones + `<option value="">Sin edición específica</option>`;
-
-            if (valorAConservar !== undefined) {
-                const valores = edicionesPartidoMemoria.map(c => c.temporada || '');
-                select.value = valores.includes(valorAConservar) ? valorAConservar : '';
+            // Las ediciones ya vienen con la más reciente primero (backend). Si no
+            // se pide conservar una en particular, se propone la más reciente.
+            const conTemporada = edicionesPartidoMemoria.filter(c => c.temporada).map(c => c.temporada);
+            if (valorAConservar === undefined) {
+                setCombo('edicion', conTemporada[0] || '');
+            } else {
+                setCombo('edicion', conTemporada.includes(valorAConservar) ? valorAConservar : '');
             }
+            refrescarIda();
         }
 
-        function toggleNuevaEdicionPartido() {
-            const nombre = document.getElementById('p-competicion-select').value;
+        // Escribir una edición que no existe y tocar "Crear ... ahora": se crea
+        // para la competición elegida y queda seleccionada.
+        async function crearEdicionDesdeTexto(temporada) {
+            const nombre = valorCombo('competicion');
+            temporada = (temporada || '').trim();
             if (!nombre) {
                 alert('Elegí primero una competición.');
                 return;
             }
-            document.getElementById('p-nueva-edicion-wrap').classList.toggle('hidden');
-            document.getElementById('p-nueva-edicion-input').focus();
-        }
-
-        async function agregarEdicionPartido() {
-            const nombre = document.getElementById('p-competicion-select').value;
-            const temporada = document.getElementById('p-nueva-edicion-input').value.trim();
-            if (!nombre || !temporada) return;
+            if (!temporada) return;
 
             let competicionCreada;
             try {
@@ -1133,14 +1356,12 @@
             } catch (e) {
                 instanciasMemoria = [];
             }
-            const opciones = instanciasMemoria.map(i => `<option value="${i.nombre}">${i.nombre}</option>`).join('');
-            const select = document.getElementById('p-instancia-select');
-            const valorPrevio = select.value;
-            select.innerHTML = opciones || `<option value="">Sin instancias registradas</option>`;
-            if (instanciasMemoria.some(i => i.nombre === valorPrevio)) select.value = valorPrevio;
         }
 
-        function abrirModalCrearInstancia() {
+        function abrirModalCrearInstancia(nombreSugerido) {
+            if (typeof nombreSugerido === 'string') {
+                document.getElementById('pop-inst-nombre').value = nombreSugerido;
+            }
             document.getElementById('modal-crear-instancia').classList.remove('hidden');
         }
 
@@ -1164,7 +1385,7 @@
             } catch (err) { return; }
 
             await cargarInstancias();
-            document.getElementById('p-instancia-select').value = instanciaCreada.nombre;
+            setCombo('instancia', instanciaCreada.nombre);
             cerrarModalCrearInstancia();
         }
 
@@ -1321,7 +1542,10 @@
                 }).join('');
 
                 let colorLocal, colorVisitante, penalesHTML = '';
-                const huboPenales = golesLocal === golesVisitante && p.penales && p.penales_ganador;
+                // En una vuelta, los penales se juegan si el GLOBAL quedó empatado
+                // (el 90' de esa vuelta puede no estar empatado).
+                const globalEmpatado = !!p.llave && p.llave.rol === 'vuelta' && p.llave.global_local === p.llave.global_visitante;
+                const huboPenales = (golesLocal === golesVisitante || globalEmpatado) && p.penales && p.penales_ganador;
                 if (huboPenales) {
                     const ganoLocal = p.penales_ganador.toLowerCase() === p.equipo_local.toLowerCase();
                     colorLocal = ganoLocal ? 'bg-emerald-400' : 'bg-red-400';
@@ -1337,6 +1561,21 @@
                     colorVisitante = 'bg-emerald-400';
                 }
 
+                let llaveHTML = '';
+                if (p.llave) {
+                    const L = p.llave;
+                    const esVuelta = L.rol === 'vuelta';
+                    const otro = `${esVuelta ? 'Ida' : 'Vuelta'} (${L.otro_fecha}): ${L.otro_local} ${L.otro_goles_local}-${L.otro_goles_visitante} ${L.otro_visitante}`;
+                    llaveHTML = `<div class="text-[11px] text-center bg-slate-900/60 border border-slate-700/50 rounded-lg px-2 py-1.5 mb-2" title="Llave de ida y vuelta">
+                        <p class="font-semibold text-sky-400"><i class="fa-solid fa-right-left mr-1"></i>${esVuelta ? 'Vuelta' : 'Ida'} - Global ${esc(p.equipo_local)} ${L.global_local}-${L.global_visitante} ${esc(p.equipo_visitante)}</p>
+                        <p class="text-slate-500 truncate">${esc(otro)}</p></div>`;
+                }
+                // Atajo para cargar la vuelta: solo en partidos que todavía no forman parte de una llave.
+                const botonVuelta = (!p.llave && !p.partido_ida_id) ? `
+                                <button onclick='abrirModalVuelta(${attrJSON({ id: p.id, competicion: p.competicion, temporada: p.temporada, instancia: p.instancia, equipo_local: p.equipo_local, equipo_visitante: p.equipo_visitante })})' title="Cargar el partido de vuelta de este partido" class="text-slate-500 hover:text-sky-400 transition-colors">
+                                    <i class="fa-solid fa-right-left text-xs"></i>
+                                </button>` : '';
+
                 contenedor.innerHTML += `
                     <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg flex flex-col">
                         <div class="flex justify-between items-start gap-2 mb-3">
@@ -1344,8 +1583,8 @@
                                 <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}${p.temporada ? ' ' + p.temporada : ''}</span>
                                 <p class="text-[11px] text-slate-400 mt-1 truncate">${p.instancia} • ${p.fecha_partido}</p>
                             </div>
-                            <div class="flex items-center gap-2.5 shrink-0">
-                                <button onclick='abrirModalEditarPartido(${JSON.stringify({ ...p, dt_local: undefined, dt_visitante: undefined })})' title="Editar partido" class="text-slate-500 hover:text-emerald-400 transition-colors">
+                            <div class="flex items-center gap-2.5 shrink-0">${botonVuelta}
+                                <button onclick='abrirModalEditarPartido(${attrJSON({ ...p, dt_local: undefined, dt_visitante: undefined })})' title="Editar partido" class="text-slate-500 hover:text-emerald-400 transition-colors">
                                     <i class="fa-solid fa-pen text-xs"></i>
                                 </button>
                                 <button onclick="borrarPartido(${p.id})" title="Borrar partido" class="text-slate-500 hover:text-red-400 transition-colors">
@@ -1371,7 +1610,7 @@
                         <div class="flex justify-between gap-2 text-[10px] px-1 mt-1.5 mb-1" title="Director técnico de cada equipo en la fecha del partido">
                             <span class="truncate w-1/2 ${p.dt_local ? 'text-slate-400' : 'text-slate-600'}"><i class="fa-solid fa-user-tie mr-1"></i>${p.dt_local ? esc(p.dt_local) : '—'}</span>
                             <span class="truncate w-1/2 text-right ${p.dt_visitante ? 'text-slate-400' : 'text-slate-600'}">${p.dt_visitante ? esc(p.dt_visitante) : '—'}<i class="fa-solid fa-user-tie ml-1"></i></span></div>
-                        ${penalesHTML}
+                        ${llaveHTML}${penalesHTML}
                         ${p.estadio ? `<p class="text-[11px] text-slate-500 text-center mb-3"><i class="fa-solid fa-location-dot mr-1"></i>${p.estadio}</p>` : '<div class="mb-3"></div>'}
 
                         <div class="space-y-1 flex-1 max-h-32 overflow-y-auto pr-0.5">
@@ -1486,8 +1725,11 @@
             setEquipoPartido('local', '');
             setEquipoPartido('visitante', '');
             setEstadioPartido('');
-            document.getElementById('p-edicion-select').innerHTML = `<option value="">Sin edición específica</option>`;
-            document.getElementById('p-nueva-edicion-wrap').classList.add('hidden');
+            // Competición e instancia quedan como la última vez (suele cargarse
+            // una racha de partidos del mismo torneo); la edición se repropone.
+            if (valorCombo('competicion')) onCambiarCompeticionPartido(); else setCombo('edicion', '');
+            document.getElementById('p-vuelta-check').checked = false;
+            toggleVuelta();
             document.getElementById('p-penales-check').checked = false;
             togglePenalesGanador();
             document.getElementById('modal-partido-titulo').innerHTML = '<i class="fa-solid fa-plus-circle text-emerald-400 mr-2"></i>Registrar Partido Visto';
@@ -1497,11 +1739,11 @@
 
         async function abrirModalEditarPartido(partido) {
             document.getElementById('p-edit-id').value = partido.id;
-            document.getElementById('p-competicion-select').value = partido.competicion;
+            setCombo('competicion', partido.competicion);
             setEquipoPartido('local', partido.equipo_local);
             setEquipoPartido('visitante', partido.equipo_visitante);
             setEstadioPartido(partido.estadio || '');
-            document.getElementById('p-instancia-select').value = partido.instancia;
+            setCombo('instancia', partido.instancia);
             document.getElementById('p-fecha').value = partido.fecha_partido;
             document.getElementById('p-penales-check').checked = !!partido.penales;
             togglePenalesGanador();
@@ -1515,6 +1757,84 @@
             // visible y TODOS los demás campos ya completos: si esta
             // petición tarda o falla, no deja el formulario a medias.
             await onCambiarCompeticionPartido(partido.temporada || '');
+            // Llave de ida y vuelta: si este partido ya es una vuelta, dejarla marcada.
+            document.getElementById('p-vuelta-check').checked = !!partido.partido_ida_id;
+            await toggleVuelta(partido.partido_ida_id || null);
+        }
+
+        // ---------- IDA Y VUELTA ----------
+        // Candidatos a "partido de ida" para el partido que se está cargando
+        // (que sería la vuelta): mismos equipos con la localía invertida y
+        // misma competición. Salen del backend para no perder los partidos
+        // que no están en la página que se ve.
+        let idaPreseleccionada = null;
+
+        async function toggleVuelta(preseleccion) {
+            const marcado = document.getElementById('p-vuelta-check').checked;
+            document.getElementById('p-vuelta-wrap').classList.toggle('hidden', !marcado);
+            if (!marcado) {
+                document.getElementById('p-ida-select').value = '';
+                idaPreseleccionada = null;
+                return;
+            }
+            if (preseleccion !== undefined && preseleccion !== null) idaPreseleccionada = preseleccion;
+            await cargarCandidatosIda();
+        }
+
+        let refrescarIdaTimeout = null;
+        function refrescarIda() {
+            if (!document.getElementById('p-vuelta-check').checked) return;
+            clearTimeout(refrescarIdaTimeout);
+            refrescarIdaTimeout = setTimeout(cargarCandidatosIda, 150);
+        }
+
+        async function cargarCandidatosIda() {
+            const select = document.getElementById('p-ida-select');
+            const ayuda = document.getElementById('p-ida-ayuda');
+            const local = document.getElementById('p-local-select').value;
+            const visitante = document.getElementById('p-visitante-select').value;
+            const competicion = valorCombo('competicion');
+            const quiero = select.value || (idaPreseleccionada ? String(idaPreseleccionada) : '');
+
+            if (!local || !visitante || !competicion) {
+                select.innerHTML = '<option value="">Elegí la ida...</option>';
+                ayuda.textContent = 'Elegí primero la competición y los dos equipos para ver las idas posibles.';
+                return;
+            }
+            const params = new URLSearchParams({ equipo_local: local, equipo_visitante: visitante, competicion });
+            const idEdicion = document.getElementById('p-edit-id').value;
+            if (idEdicion) params.set('excluir_id', idEdicion);
+
+            let lista = [];
+            try {
+                const res = await fetch(`${API_URL}/partidos/candidatos-ida?${params}`);
+                if (!res.ok) throw new Error();
+                lista = await res.json();
+            } catch (e) {
+                ayuda.textContent = 'No se pudieron cargar las idas posibles.';
+                return;
+            }
+            select.innerHTML = '<option value="">Elegí la ida...</option>' + lista.map(p =>
+                `<option value="${p.id}">${esc(p.fecha_partido)} - ${esc(p.instancia)}: ${esc(p.equipo_local)} ${p.goles_local}-${p.goles_visitante} ${esc(p.equipo_visitante)}</option>`
+            ).join('');
+            if (lista.some(p => String(p.id) === quiero)) select.value = quiero;
+            else if (lista.length === 1) select.value = String(lista[0].id);
+            ayuda.textContent = lista.length
+                ? 'En la vuelta se invierte la localía: el local de la ida es el visitante acá.'
+                : `No hay ningún partido de ${visitante} vs ${local} en esta competición para usar como ida. Cargalo primero.`;
+        }
+
+        // Atajo desde la tarjeta de la ida: abre un partido nuevo ya preparado como su vuelta.
+        async function abrirModalVuelta(ida) {
+            abrirModalNuevoPartido();
+            setCombo('competicion', ida.competicion);
+            setCombo('instancia', ida.instancia);
+            setEquipoPartido('local', ida.equipo_visitante);
+            setEquipoPartido('visitante', ida.equipo_local);
+            document.getElementById('p-fecha').value = '';
+            document.getElementById('p-vuelta-check').checked = true;
+            await onCambiarCompeticionPartido(ida.temporada || '');
+            await toggleVuelta(ida.id);
         }
 
         function cerrarModalNuevoPartido() {
@@ -1574,13 +1894,38 @@
                 return;
             }
 
+            if (!valorCombo('competicion')) {
+                alert(comboPendiente('competicion')
+                    ? "Elegí la competición de la lista o creá una nueva."
+                    : "Elegí la competición.");
+                return;
+            }
+            if (comboPendiente('edicion')) {
+                alert("Elegí la edición de la lista, creá una nueva o dejá el campo vacío.");
+                return;
+            }
+            if (!valorCombo('instancia')) {
+                alert(comboPendiente('instancia')
+                    ? "Elegí la instancia de la lista o creá una nueva."
+                    : "Elegí la instancia.");
+                return;
+            }
+
+            const esVuelta = document.getElementById('p-vuelta-check').checked;
+            const idaId = document.getElementById('p-ida-select').value;
+            if (esVuelta && !idaId) {
+                alert("Elegí cuál fue el partido de ida, o desmarcá la opción de vuelta.");
+                return;
+            }
+
             const data = {
-                competicion: document.getElementById('p-competicion-select').value,
-                temporada: document.getElementById('p-edicion-select').value || null,
+                competicion: valorCombo('competicion'),
+                temporada: valorCombo('edicion') || null,
+                partido_ida_id: esVuelta ? parseInt(idaId, 10) : null,
                 equipo_local: local,
                 equipo_visitante: visitante,
                 estadio: document.getElementById('p-estadio-select').value || null,
-                instancia: document.getElementById('p-instancia-select').value,
+                instancia: valorCombo('instancia'),
                 fecha_partido: document.getElementById('p-fecha').value,
                 penales: penales,
                 penales_ganador: penales ? penalesGanador : null

@@ -61,6 +61,34 @@ def _asegurar_columna_fecha_nacimiento_jugadores():
 
 _asegurar_columna_fecha_nacimiento_jugadores()
 
+
+def _asegurar_columna_partido_ida_id():
+    """Agrega 'partido_ida_id' a 'partidos' si todavía no está (create_all()
+    no toca tablas que ya existen, como la de Render). Idempotente. Los
+    partidos ya cargados quedan con NULL = partido suelto, como hasta ahora."""
+    inspector = inspect(engine)
+    if "partidos" not in inspector.get_table_names():
+        return
+    columnas = [c["name"] for c in inspector.get_columns("partidos")]
+    if "partido_ida_id" in columnas:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE partidos ADD COLUMN partido_ida_id INTEGER"))
+    # El índice y la FK van aparte: si alguno falla no se pierde la columna.
+    for sentencia in (
+        "CREATE INDEX ix_partidos_partido_ida_id ON partidos (partido_ida_id)",
+        "ALTER TABLE partidos ADD CONSTRAINT fk_partidos_partido_ida "
+        "FOREIGN KEY (partido_ida_id) REFERENCES partidos (id) ON DELETE SET NULL",
+    ):
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sentencia))
+        except Exception:
+            pass
+
+
+_asegurar_columna_partido_ida_id()
+
 app = FastAPI(title="Futbol Tracker API")
 
 # Configurar CORS
@@ -186,6 +214,44 @@ def crear_estadio(estadio: schemas.EstadioCreate, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="Ese estadio ya existe")
     db.refresh(nuevo_estadio)
     return nuevo_estadio
+
+
+@app.put("/estadios/{estadio_id}", response_model=schemas.EstadioResponse)
+def actualizar_estadio(estadio_id: int, datos: schemas.EstadioUpdate, db: Session = Depends(get_db)):
+    """Corrige nombre y/o ciudad de un estadio. Los partidos guardan el
+    estadio como texto, así que si cambia el nombre se actualiza también
+    en todos los partidos que lo usaban."""
+    estadio = db.query(models.Estadio).filter(models.Estadio.id == estadio_id).first()
+    if not estadio:
+        raise HTTPException(status_code=404, detail="Estadio no encontrado")
+
+    nombre_clean = datos.nombre.strip()
+    if not nombre_clean:
+        raise HTTPException(status_code=400, detail="El nombre del estadio no puede estar vacío")
+
+    duplicado = db.query(models.Estadio).filter(
+        func.lower(models.Estadio.nombre) == nombre_clean.lower(),
+        models.Estadio.id != estadio_id,
+    ).first()
+    if duplicado:
+        raise HTTPException(status_code=400, detail="Ya existe otro estadio con ese nombre")
+
+    nombre_viejo = estadio.nombre
+    estadio.nombre = nombre_clean
+    estadio.ciudad = (datos.ciudad or "").strip() or None
+
+    if nombre_viejo != nombre_clean:
+        db.query(models.Partido).filter(
+            func.lower(models.Partido.estadio) == nombre_viejo.strip().lower()
+        ).update({models.Partido.estadio: nombre_clean}, synchronize_session=False)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Ya existe otro estadio con ese nombre")
+    db.refresh(estadio)
+    return estadio
 
 
 @app.delete("/estadios/{estadio_id}", status_code=204)
@@ -693,6 +759,144 @@ def _validar_penales(local: str, visitante: str, penales: bool, penales_ganador:
     )
 
 
+def _goles_de(p: "models.Partido", equipo: str) -> int:
+    e = equipo.strip().lower()
+    return sum(1 for g in p.goles if g.equipo.strip().lower() == e)
+
+
+def _validar_llave(db: Session, ida_id: Optional[int], local: str, visitante: str,
+                   competicion: str, fecha: date, partido_id: Optional[int] = None) -> Optional[int]:
+    """Chequea que `ida_id` sea una ida válida para este partido (que sería
+    la vuelta) y devuelve el id normalizado (None si no es una vuelta)."""
+    if not ida_id:
+        return None
+    if partido_id is not None and ida_id == partido_id:
+        raise HTTPException(status_code=400, detail="Un partido no puede ser la vuelta de sí mismo")
+
+    ida = db.query(models.Partido).filter(models.Partido.id == ida_id).first()
+    if not ida:
+        raise HTTPException(status_code=400, detail="El partido de ida elegido no existe")
+    if ida.partido_ida_id:
+        raise HTTPException(status_code=400, detail="Ese partido ya es una vuelta: no puede ser la ida de otra llave")
+    if not (ida.equipo_local.strip().lower() == visitante.lower()
+            and ida.equipo_visitante.strip().lower() == local.lower()):
+        raise HTTPException(
+            status_code=400,
+            detail=f"En la vuelta se invierte la localía: la ida fue {ida.equipo_local} vs {ida.equipo_visitante}",
+        )
+    if ida.competicion.strip().lower() != competicion.strip().lower():
+        raise HTTPException(status_code=400, detail="La ida y la vuelta tienen que ser de la misma competición")
+    if fecha < ida.fecha_partido:
+        raise HTTPException(status_code=400, detail="La vuelta no puede ser anterior a la ida")
+
+    q = db.query(models.Partido).filter(models.Partido.partido_ida_id == ida.id)
+    if partido_id is not None:
+        q = q.filter(models.Partido.id != partido_id)
+    if q.first():
+        raise HTTPException(status_code=400, detail="Esa ida ya tiene un partido de vuelta cargado")
+
+    if partido_id is not None and db.query(models.Partido).filter(
+        models.Partido.partido_ida_id == partido_id
+    ).first():
+        raise HTTPException(
+            status_code=400,
+            detail="Este partido ya es la ida de otra llave: no puede ser también una vuelta",
+        )
+    return ida.id
+
+
+def anotar_llave(db: Session, partidos) -> None:
+    """Le pega a cada partido `llave` (lo lee PartidoResponse): rol dentro de
+    la llave, resultado del otro partido y marcador global."""
+    partidos = [p for p in partidos if p is not None]
+    if not partidos:
+        return
+    ids = [p.id for p in partidos]
+    ida_ids = {p.partido_ida_id for p in partidos if p.partido_ida_id}
+
+    cargar = lambda q: q.options(selectinload(models.Partido.goles)).all()
+    vueltas = {
+        v.partido_ida_id: v
+        for v in cargar(db.query(models.Partido).filter(models.Partido.partido_ida_id.in_(ids)))
+    }
+    idas = {}
+    if ida_ids:
+        idas = {i.id: i for i in cargar(db.query(models.Partido).filter(models.Partido.id.in_(ida_ids)))}
+
+    for p in partidos:
+        otro, rol = None, None
+        if p.partido_ida_id and p.partido_ida_id in idas:
+            otro, rol = idas[p.partido_ida_id], "vuelta"
+        elif p.id in vueltas:
+            otro, rol = vueltas[p.id], "ida"
+        if not otro:
+            p.llave = None
+            continue
+        penales_ganador = (p.penales_ganador if p.penales else None) or (otro.penales_ganador if otro.penales else None)
+        p.llave = {
+            "rol": rol,
+            "otro_id": otro.id,
+            "otro_fecha": otro.fecha_partido.isoformat(),
+            "otro_local": otro.equipo_local,
+            "otro_visitante": otro.equipo_visitante,
+            "otro_goles_local": _goles_de(otro, otro.equipo_local),
+            "otro_goles_visitante": _goles_de(otro, otro.equipo_visitante),
+            # Global desde el punto de vista de este partido (local/visitante de ESTE partido)
+            "global_local": _goles_de(p, p.equipo_local) + _goles_de(otro, p.equipo_local),
+            "global_visitante": _goles_de(p, p.equipo_visitante) + _goles_de(otro, p.equipo_visitante),
+            "penales_ganador": penales_ganador,
+        }
+
+
+@app.get("/partidos/candidatos-ida")
+def candidatos_ida(
+    equipo_local: str = Query(..., min_length=1),
+    equipo_visitante: str = Query(..., min_length=1),
+    competicion: str = Query(..., min_length=1),
+    excluir_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """Partidos que pueden ser la IDA del partido que se está cargando
+    (la vuelta): mismos equipos con la localía invertida, misma competición,
+    que no sean ya una vuelta ni tengan otra vuelta cargada."""
+    low = lambda c, v: func.lower(c) == v.strip().lower()
+    q = (
+        db.query(models.Partido)
+        .options(selectinload(models.Partido.goles))
+        .filter(
+            low(models.Partido.equipo_local, equipo_visitante),
+            low(models.Partido.equipo_visitante, equipo_local),
+            low(models.Partido.competicion, competicion),
+            models.Partido.partido_ida_id.is_(None),
+        )
+    )
+    if excluir_id is not None:
+        q = q.filter(models.Partido.id != excluir_id)
+    candidatos = q.order_by(models.Partido.fecha_partido.desc(), models.Partido.id.desc()).all()
+    if not candidatos:
+        return []
+
+    filtro_ocupadas = models.Partido.partido_ida_id.in_([c.id for c in candidatos])
+    if excluir_id is not None:
+        filtro_ocupadas = filtro_ocupadas & (models.Partido.id != excluir_id)
+    ocupadas = {pid for (pid,) in db.query(models.Partido.partido_ida_id).filter(filtro_ocupadas).all()}
+
+    return [
+        {
+            "id": c.id,
+            "fecha_partido": c.fecha_partido.isoformat(),
+            "instancia": c.instancia,
+            "temporada": c.temporada,
+            "equipo_local": c.equipo_local,
+            "equipo_visitante": c.equipo_visitante,
+            "goles_local": _goles_de(c, c.equipo_local),
+            "goles_visitante": _goles_de(c, c.equipo_visitante),
+        }
+        for c in candidatos
+        if c.id not in ocupadas
+    ]
+
+
 def _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales, dt_cond=None):
     low = lambda c, v: func.lower(c) == v.strip().lower()
     if dt_cond is not None:
@@ -753,6 +957,7 @@ def obtener_partidos(
     orden_cols = (fecha.desc(), models.Partido.id.desc()) if orden == "reciente" else (fecha.asc(), models.Partido.id.asc())
     resultado = query.order_by(*orden_cols).offset(skip).limit(limit).all()
     dts.anotar_dts(db, resultado)
+    anotar_llave(db, resultado)
     return resultado
 
 
@@ -802,8 +1007,10 @@ def crear_partido(partido: schemas.PartidoCreate, db: Session = Depends(get_db))
         )
 
     ganador_penales = _validar_penales(local, visitante, partido.penales, partido.penales_ganador)
+    ida_id = _validar_llave(db, partido.partido_ida_id, local, visitante, partido.competicion, partido.fecha_partido)
 
     datos = partido.model_dump()
+    datos["partido_ida_id"] = ida_id
     datos["equipo_local"] = local
     datos["equipo_visitante"] = visitante
     datos["penales_ganador"] = ganador_penales
@@ -817,6 +1024,7 @@ def crear_partido(partido: schemas.PartidoCreate, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="Ya existe un partido igual registrado")
     db.refresh(nuevo_partido)
     dts.anotar_dts(db, [nuevo_partido])
+    anotar_llave(db, [nuevo_partido])
     return nuevo_partido
 
 
@@ -857,7 +1065,21 @@ def actualizar_partido(partido_id: int, datos: schemas.PartidoUpdate, db: Sessio
             gol.equipo = visitante
 
     ganador_penales = _validar_penales(local, visitante, datos.penales, datos.penales_ganador)
+    ida_id = _validar_llave(db, datos.partido_ida_id, local, visitante, datos.competicion, datos.fecha_partido, partido_id)
 
+    # Si este partido es la ida de una vuelta ya cargada, los equipos tienen
+    # que seguir siendo los mismos (con la localía invertida en la vuelta).
+    vuelta = db.query(models.Partido).filter(models.Partido.partido_ida_id == partido_id).first()
+    if vuelta and not (
+        vuelta.equipo_local.strip().lower() == visitante.lower()
+        and vuelta.equipo_visitante.strip().lower() == local.lower()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Este partido es la ida de una vuelta ya cargada: no se pueden cambiar los equipos sin desvincularla antes",
+        )
+
+    partido.partido_ida_id = ida_id
     partido.competicion = datos.competicion
     partido.temporada = (datos.temporada or "").strip() or None
     partido.equipo_local = local
@@ -875,6 +1097,7 @@ def actualizar_partido(partido_id: int, datos: schemas.PartidoUpdate, db: Sessio
         raise HTTPException(status_code=400, detail="Ya existe un partido igual registrado")
     db.refresh(partido)
     dts.anotar_dts(db, [partido])
+    anotar_llave(db, [partido])
     return partido
 
 
@@ -883,6 +1106,10 @@ def borrar_partido(partido_id: int, db: Session = Depends(get_db)):
     partido = db.query(models.Partido).filter(models.Partido.id == partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
+    # Si era la ida de una llave, la vuelta queda como partido suelto.
+    db.query(models.Partido).filter(models.Partido.partido_ida_id == partido_id).update(
+        {models.Partido.partido_ida_id: None}, synchronize_session=False
+    )
     db.delete(partido)  # cascade borra también sus goles
     db.commit()
     return None
