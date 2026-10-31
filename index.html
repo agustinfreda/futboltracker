@@ -1571,7 +1571,7 @@
                         <div class="flex items-center justify-between bg-slate-900 px-2.5 py-1 rounded text-[11px]">
                             <div class="truncate pr-2">
                                 <span class="font-bold text-emerald-400">${g.minuto}'</span>
-                                <span class="text-ink font-medium">${esc(nombreCorto(g.jugador))}</span>
+                                <span class="text-ink font-medium">${esc(nombreJug(g.jugador))}</span>
                                 <span class="text-slate-500">${g.tipo !== 'JUGADA' ? '· ' + g.tipo : ''}</span>
                             </div>
                             <button onclick="borrarGol(${g.id})" title="Borrar gol" class="text-slate-600 hover:text-red-400 transition-colors shrink-0">
@@ -2405,7 +2405,7 @@
             const gl = p.goles.filter(g => g.equipo.toLowerCase() === l), gv = p.goles.filter(g => g.equipo.toLowerCase() === v);
             const dt = n => n ? `<p class="text-xs muted mt-1.5"><i class="fa-solid fa-user-tie mr-1.5"></i>${esc(n)}</p>` : '';
             const lista = (gs, alin) => gs.length ? `<ul class="mt-3 space-y-0.5 text-xs ${alin}">` + gs.map(g =>
-                `<li><span class="text-emerald-400 font-semibold tabular-nums">${esc(g.minuto)}'</span> ${esc(nombreCorto(g.jugador))}${g.tipo !== 'JUGADA' ? ` <span class="muted">(${esc(g.tipo.toLowerCase())})</span>` : ''}</li>`).join('') + '</ul>' : '';
+                `<li><span class="text-emerald-400 font-semibold tabular-nums">${esc(g.minuto)}'</span> ${esc(nombreJug(g.jugador))}${g.tipo !== 'JUGADA' ? ` <span class="muted">(${esc(g.tipo.toLowerCase())})</span>` : ''}</li>`).join('') + '</ul>' : '';
             const pen = (p.penales && p.penales_ganador && gl.length === gv.length)
                 ? `<p class="text-center text-sm mt-5" style="color:#fbbf24"><i class="fa-solid fa-futbol mr-1.5"></i>${esc(p.penales_ganador)} ganó por penales</p>` : '';
             return `<div class="scoreboard rounded-2xl p-6 md:p-8 h-full">
