@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Date, Boolean, ForeignKey, UniqueConstraint, Index, func
+from sqlalchemy import Column, Integer, String, Text, Date, Boolean, ForeignKey, UniqueConstraint, CheckConstraint, Index, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -37,6 +37,30 @@ class DT(Base):
     hasta = Column(Date, nullable=True)
 
     equipo = relationship("Equipo", back_populates="dts")
+
+
+class Clasico(Base):
+    """Enfrentamiento clásico registrado entre dos clubes (ej. "Superclásico").
+    Los partidos NO guardan nada del clásico: se reconocen solos comparando los
+    nombres de local/visitante con este par de clubes, en cualquier orden. Por
+    eso, editar un partido no rompe la marca de clásico mientras los equipos
+    sigan siendo los mismos.
+    El par se guarda siempre ordenado (equipo_a_id < equipo_b_id): así
+    "River-Boca" y "Boca-River" son el mismo registro y el UniqueConstraint
+    impide cargar dos veces el mismo enfrentamiento."""
+    __tablename__ = "clasicos"
+    __table_args__ = (
+        UniqueConstraint("equipo_a_id", "equipo_b_id", name="uq_clasico_par"),
+        CheckConstraint("equipo_a_id < equipo_b_id", name="ck_clasico_par_ordenado"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(150), nullable=False)
+    equipo_a_id = Column(Integer, ForeignKey("equipos.id", ondelete="CASCADE"), nullable=False, index=True)
+    equipo_b_id = Column(Integer, ForeignKey("equipos.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    equipo_a = relationship("Equipo", foreign_keys=[equipo_a_id], lazy="joined")
+    equipo_b = relationship("Equipo", foreign_keys=[equipo_b_id], lazy="joined")
 
 
 class Estadio(Base):

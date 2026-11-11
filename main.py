@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import extract, func, inspect, or_, text
+from sqlalchemy import and_, extract, false, func, inspect, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -184,6 +184,10 @@ def borrar_equipo(equipo_id: int, db: Session = Depends(get_db)):
             detail="No se puede borrar: el equipo tiene partidos registrados. Borrá esos partidos primero.",
         )
 
+    # Los clásicos que lo usan se van con él (la FK también lo hace en la BD).
+    db.query(models.Clasico).filter(
+        or_(models.Clasico.equipo_a_id == equipo_id, models.Clasico.equipo_b_id == equipo_id)
+    ).delete(synchronize_session=False)
     db.delete(equipo)
     db.commit()
     return None
@@ -1001,6 +1005,8 @@ def obtener_partidos(
     hasta: Optional[date] = None,
     penales: bool = False,
     dt: Optional[str] = None,
+    clasico_id: Optional[int] = None,
+    solo_clasicos: bool = False,
     orden: str = Query("reciente", pattern="^(reciente|antiguo)$"),
     db: Session = Depends(get_db),
 ):
@@ -1009,11 +1015,15 @@ def obtener_partidos(
     )
     dt_cond = dts.condicion_dt(db, dt) if dt and dt.strip() else None
     query = _filtrar_partidos(query, competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales, dt_cond)
+    cond_clasico = condicion_clasicos(db, clasico_id, solo_clasicos)
+    if cond_clasico is not None:
+        query = query.filter(cond_clasico)
     fecha = models.Partido.fecha_partido
     orden_cols = (fecha.desc(), models.Partido.id.desc()) if orden == "reciente" else (fecha.asc(), models.Partido.id.asc())
     resultado = query.order_by(*orden_cols).offset(skip).limit(limit).all()
     dts.anotar_dts(db, resultado)
     anotar_llave(db, resultado)
+    anotar_clasicos(db, resultado)
     return resultado
 
 
@@ -1022,10 +1032,14 @@ def conteo_partidos(
     competicion: Optional[str] = None, temporada: Optional[str] = None, anio: Optional[int] = None,
     equipo: Optional[str] = None, q: Optional[str] = None, instancia: Optional[str] = None,
     estadio: Optional[str] = None, desde: Optional[date] = None, hasta: Optional[date] = None,
-    penales: bool = False, dt: Optional[str] = None, db: Session = Depends(get_db),
+    penales: bool = False, dt: Optional[str] = None,
+    clasico_id: Optional[int] = None, solo_clasicos: bool = False, db: Session = Depends(get_db),
 ):
     dt_cond = dts.condicion_dt(db, dt) if dt and dt.strip() else None
     query = _filtrar_partidos(db.query(models.Partido), competicion, temporada, anio, equipo, q, instancia, estadio, desde, hasta, penales, dt_cond)
+    cond_clasico = condicion_clasicos(db, clasico_id, solo_clasicos)
+    if cond_clasico is not None:
+        query = query.filter(cond_clasico)
     return {"total": query.count()}
 
 
@@ -1081,6 +1095,7 @@ def crear_partido(partido: schemas.PartidoCreate, db: Session = Depends(get_db))
     db.refresh(nuevo_partido)
     dts.anotar_dts(db, [nuevo_partido])
     anotar_llave(db, [nuevo_partido])
+    anotar_clasicos(db, [nuevo_partido])
     return nuevo_partido
 
 
@@ -1154,6 +1169,7 @@ def actualizar_partido(partido_id: int, datos: schemas.PartidoUpdate, db: Sessio
     db.refresh(partido)
     dts.anotar_dts(db, [partido])
     anotar_llave(db, [partido])
+    anotar_clasicos(db, [partido])  # se recalcula con los equipos ya editados
     return partido
 
 
@@ -1441,6 +1457,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
 
     if ultimo_partido:
         dts.anotar_dts(db, [ultimo_partido])
+        anotar_clasicos(db, [ultimo_partido])
 
     filas_goleadores = (
         db.query(models.Jugador.nombre, func.count(models.Gol.id).label("total"), models.Jugador.apodo)
@@ -1637,6 +1654,7 @@ def panel_dashboard(db: Session = Depends(get_db)):
     partidos = _cargar_partidos(db)
     data = _metricas(partidos)
     dts.anotar_dts(db, partidos[:1])  # DTs del último partido (marcador de Inicio)
+    anotar_clasicos(db, partidos[:5])  # etiqueta de clásico en el marcador y en los últimos partidos
     hoy = date.today()
     data["partidos_anio"] = sum(1 for p in partidos if p.fecha_partido.year == hoy.year)
     data["anio_actual"] = hoy.year
@@ -1649,6 +1667,7 @@ def panel_dashboard(db: Session = Depends(get_db)):
             "temporada": p.temporada, "instancia": p.instancia,
             "local": p.equipo_local, "visitante": p.equipo_visitante,
             "gl": _marcador(p)[0], "gv": _marcador(p)[1],
+            "clasico": p.clasico,
         }
         for p in partidos[:5]
     ]
@@ -1768,6 +1787,301 @@ def estadisticas_dts(
         "duelos": duelos_out,
         "carrusel": [{"nombre": c, "valor": n} for c, n in carrusel],
         "mayor_goleada": mayor_goleada,
+    }
+
+
+# ==========================================================
+# CLÁSICOS
+# Un clásico es un par de clubes con un nombre propio. Los partidos no guardan
+# nada: se reconocen comparando local/visitante con el par, en cualquier orden,
+# cada vez que se consultan (así editar un partido mantiene la marca).
+# ==========================================================
+def _k(nombre: Optional[str]) -> str:
+    return (nombre or "").strip().lower()
+
+
+def _clave_par(a: str, b: str) -> frozenset:
+    return frozenset((_k(a), _k(b)))
+
+
+def _indice_clasicos(db: Session) -> dict:
+    """clave del par de clubes -> Clasico."""
+    return {_clave_par(c.equipo_a.nombre, c.equipo_b.nombre): c for c in db.query(models.Clasico).all()}
+
+
+def anotar_clasicos(db: Session, partidos) -> None:
+    """Le pega a cada partido `clasico` ({id, nombre} o None); lo lee PartidoResponse."""
+    partidos = [p for p in partidos if p is not None]
+    if not partidos:
+        return
+    idx = _indice_clasicos(db)
+    for p in partidos:
+        c = idx.get(_clave_par(p.equipo_local, p.equipo_visitante)) if idx else None
+        p.clasico = {"id": c.id, "nombre": c.nombre} if c else None
+
+
+def _cond_par(c: "models.Clasico"):
+    a, b = _k(c.equipo_a.nombre), _k(c.equipo_b.nombre)
+    loc, vis = func.lower(models.Partido.equipo_local), func.lower(models.Partido.equipo_visitante)
+    return or_(and_(loc == a, vis == b), and_(loc == b, vis == a))
+
+
+def condicion_clasicos(db: Session, clasico_id: Optional[int] = None, solo: bool = False):
+    """Condición SQL para filtrar partidos de un clásico (o de cualquiera). None = sin filtro."""
+    if clasico_id:
+        return _cond_par(_clasico_o_404(db, clasico_id))
+    if solo:
+        todos = db.query(models.Clasico).all()
+        return or_(*[_cond_par(c) for c in todos]) if todos else false()
+    return None
+
+
+def _clasico_o_404(db: Session, clasico_id: int) -> "models.Clasico":
+    c = db.query(models.Clasico).filter(models.Clasico.id == clasico_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Clásico no encontrado")
+    return c
+
+
+def _escudos(db: Session, clasicos) -> dict:
+    ids = {c.equipo_a_id for c in clasicos} | {c.equipo_b_id for c in clasicos}
+    if not ids:
+        return {}
+    return {e.equipo_id: e.escudo for e in db.query(models.EquipoEscudo).filter(models.EquipoEscudo.equipo_id.in_(ids)).all()}
+
+
+def _base_clasico(c: "models.Clasico", escudos: dict) -> dict:
+    eq = lambda e: {"id": e.id, "nombre": e.nombre, "escudo": escudos.get(e.id)}
+    return {"id": c.id, "nombre": c.nombre, "equipo_a": eq(c.equipo_a), "equipo_b": eq(c.equipo_b)}
+
+
+def _partidos_de_clasicos(db: Session, clasicos, competicion=None, temporada=None, anio=None) -> dict:
+    """clasico.id -> partidos en orden cronológico (con goles cargados)."""
+    res = {c.id: [] for c in clasicos}
+    if not clasicos:
+        return res
+    q = db.query(models.Partido).options(selectinload(models.Partido.goles))
+    q = _filtrar_por_partido(q, competicion, anio, temporada)
+    q = q.filter(or_(*[_cond_par(c) for c in clasicos]))
+    por_clave = {_clave_par(c.equipo_a.nombre, c.equipo_b.nombre): c.id for c in clasicos}
+    for p in q.order_by(models.Partido.fecha_partido.asc(), models.Partido.id.asc()).all():
+        cid = por_clave.get(_clave_par(p.equipo_local, p.equipo_visitante))
+        if cid:
+            res[cid].append(p)
+    return res
+
+
+def _resumen_partido(p: "models.Partido", gl: int, gv: int) -> dict:
+    return {
+        "id": p.id, "fecha": p.fecha_partido.isoformat(), "competicion": p.competicion,
+        "temporada": p.temporada, "instancia": p.instancia, "estadio": p.estadio,
+        "local": p.equipo_local, "visitante": p.equipo_visitante, "gl": gl, "gv": gv,
+        "penales_ganador": p.penales_ganador if (p.penales and gl == gv) else None,
+    }
+
+
+def _stats_clasico(c: "models.Clasico", partidos, detalle: bool = True) -> dict:
+    """Estadísticas del clásico sobre `partidos` (ya filtrados y ordenados por fecha).
+    Victoria/empate se cuentan por el marcador; si un empate se definió por
+    penales se anota aparte (pen_g) pero sigue siendo empate."""
+    a, b = c.equipo_a.nombre, c.equipo_b.nombre
+    lado = lambda: {"pj": 0, "g": 0, "e": 0, "p": 0, "gf": 0, "gc": 0}
+    eq = {
+        _k(n): {"nombre": n, "g": 0, "e": 0, "p": 0, "gf": 0, "gc": 0, "pen_g": 0,
+                "racha": 0, "mejor_racha": 0, "local": lado(), "visitante": lado()}
+        for n in (a, b)
+    }
+    historial, empates, goles_total = [], 0, 0
+    mayor_dif = mas_goles = None
+
+    for p in partidos:
+        gl, gv = _marcador(p)
+        r = _resumen_partido(p, gl, gv)
+        historial.append(r)
+        goles_total += gl + gv
+        empates += gl == gv
+        for k, donde, gf, gc in ((_k(p.equipo_local), "local", gl, gv), (_k(p.equipo_visitante), "visitante", gv, gl)):
+            e = eq[k]
+            e["gf"] += gf
+            e["gc"] += gc
+            d = e[donde]
+            d["pj"] += 1
+            d["gf"] += gf
+            d["gc"] += gc
+            if gf > gc:
+                e["g"] += 1
+                d["g"] += 1
+                e["racha"] += 1
+                e["mejor_racha"] = max(e["mejor_racha"], e["racha"])
+            else:
+                e["racha"] = 0
+                if gf == gc:
+                    e["e"] += 1
+                    d["e"] += 1
+                    if p.penales and _k(p.penales_ganador) == k:
+                        e["pen_g"] += 1
+                else:
+                    e["p"] += 1
+                    d["p"] += 1
+        dif = abs(gl - gv)
+        if dif > 0 and (mayor_dif is None or dif > mayor_dif["diferencia"]):
+            mayor_dif = {**r, "diferencia": dif}
+        if gl + gv > 0 and (mas_goles is None or gl + gv > mas_goles["goles"]):
+            mas_goles = {**r, "goles": gl + gv}
+
+    equipos = []
+    for n in (a, b):
+        e = eq[_k(n)]
+        equipos.append({
+            "nombre": e["nombre"], "g": e["g"], "e": e["e"], "p": e["p"], "gf": e["gf"], "gc": e["gc"],
+            "dg": e["gf"] - e["gc"], "pen_g": e["pen_g"],
+            "mejor_racha": e["mejor_racha"], "racha_actual": e["racha"],
+            "local": e["local"], "visitante": e["visitante"],
+        })
+    total = len(partidos)
+    out = {
+        "total": total, "empates": empates, "goles_total": goles_total,
+        "promedio_goles": round(goles_total / total, 2) if total else 0,
+        "equipos": equipos,
+        "ultimo": historial[-1] if historial else None,
+        "mayor_diferencia": mayor_dif, "mas_goles": mas_goles,
+    }
+    if detalle:
+        out["historial"] = historial
+    return out
+
+
+def _validar_clasico(db: Session, nombre: str, a_id: int, b_id: int, excluir_id: Optional[int] = None):
+    nombre = (nombre or "").strip()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="El clásico necesita un nombre")
+    if len(nombre) > 150:
+        raise HTTPException(status_code=400, detail="El nombre del clásico es demasiado largo (máx. 150)")
+    if a_id == b_id:
+        raise HTTPException(status_code=400, detail="Elegí dos equipos distintos")
+    for eid in (a_id, b_id):
+        if not db.query(models.Equipo).filter(models.Equipo.id == eid).first():
+            raise HTTPException(status_code=400, detail="Uno de los equipos elegidos no existe")
+    lo, hi = sorted((a_id, b_id))  # el par se guarda ordenado: River-Boca == Boca-River
+    q = db.query(models.Clasico).filter(models.Clasico.equipo_a_id == lo, models.Clasico.equipo_b_id == hi)
+    if excluir_id is not None:
+        q = q.filter(models.Clasico.id != excluir_id)
+    dup = q.first()
+    if dup:
+        raise HTTPException(status_code=400, detail=f"Ese enfrentamiento ya está registrado como «{dup.nombre}»")
+    return nombre, lo, hi
+
+
+@app.get("/clasicos/")
+def listar_clasicos(
+    competicion: Optional[str] = None, temporada: Optional[str] = None, anio: Optional[int] = None,
+    estadisticas: bool = True, db: Session = Depends(get_db),
+):
+    """Tarjetas de clásicos. Con estadisticas=false devuelve solo equipos y nombre (liviano)."""
+    clasicos = db.query(models.Clasico).all()
+    esc = _escudos(db, clasicos)
+    partidos = _partidos_de_clasicos(db, clasicos, competicion, temporada, anio) if estadisticas else {}
+    out = []
+    for c in clasicos:
+        item = _base_clasico(c, esc)
+        if estadisticas:
+            item.update(_stats_clasico(c, partidos[c.id], detalle=False))
+        out.append(item)
+    return sorted(out, key=lambda x: x["nombre"].lower())
+
+
+@app.get("/clasicos/panel")
+def panel_clasicos(
+    competicion: Optional[str] = None, temporada: Optional[str] = None, anio: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """Ranking de clásicos por partidos registrados + tabla de comparación histórica."""
+    clasicos = db.query(models.Clasico).all()
+    partidos = _partidos_de_clasicos(db, clasicos, competicion, temporada, anio)
+    total_partidos = _filtrar_por_partido(db.query(models.Partido), competicion, anio, temporada).count()
+    filas = []
+    for c in clasicos:
+        st = _stats_clasico(c, partidos[c.id], detalle=False)
+        ea, eb = st["equipos"]
+        filas.append({
+            "id": c.id, "nombre": c.nombre, "equipo_a": ea["nombre"], "equipo_b": eb["nombre"],
+            "total": st["total"], "ga": ea["g"], "gb": eb["g"], "empates": st["empates"],
+            "pct_empates": round(st["empates"] / st["total"] * 100) if st["total"] else 0,
+            "goles_total": st["goles_total"], "promedio_goles": st["promedio_goles"],
+            "mayor_diferencia": st["mayor_diferencia"], "mas_goles": st["mas_goles"],
+        })
+    en_clasicos = sum(f["total"] for f in filas)
+    ranking = [
+        {"id": f["id"], "nombre": f["nombre"], "detalle": f"{f['equipo_a']} vs {f['equipo_b']}", "valor": f["total"]}
+        for f in sorted(filas, key=lambda f: (-f["total"], f["nombre"].lower()))
+    ]
+    return {
+        "total_clasicos": len(clasicos), "partidos_clasicos": en_clasicos, "total_partidos": total_partidos,
+        "pct_clasicos": round(en_clasicos / total_partidos * 100) if total_partidos else 0,
+        "ranking": ranking, "comparacion": filas,
+    }
+
+
+@app.post("/clasicos/")
+def crear_clasico(datos: schemas.ClasicoCreate, db: Session = Depends(get_db)):
+    nombre, lo, hi = _validar_clasico(db, datos.nombre, datos.equipo_a_id, datos.equipo_b_id)
+    nuevo = models.Clasico(nombre=nombre, equipo_a_id=lo, equipo_b_id=hi)
+    db.add(nuevo)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Ese enfrentamiento ya está registrado")
+    db.refresh(nuevo)
+    return _base_clasico(nuevo, _escudos(db, [nuevo]))
+
+
+@app.put("/clasicos/{clasico_id}")
+def actualizar_clasico(clasico_id: int, datos: schemas.ClasicoUpdate, db: Session = Depends(get_db)):
+    c = _clasico_o_404(db, clasico_id)
+    nombre, lo, hi = _validar_clasico(db, datos.nombre, datos.equipo_a_id, datos.equipo_b_id, excluir_id=clasico_id)
+    c.nombre, c.equipo_a_id, c.equipo_b_id = nombre, lo, hi
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Ese enfrentamiento ya está registrado")
+    db.expire_all()
+    c = _clasico_o_404(db, clasico_id)
+    return _base_clasico(c, _escudos(db, [c]))
+
+
+@app.delete("/clasicos/{clasico_id}", status_code=204)
+def borrar_clasico(clasico_id: int, db: Session = Depends(get_db)):
+    """Solo borra el registro del clásico: los partidos siguen intactos."""
+    c = _clasico_o_404(db, clasico_id)
+    db.delete(c)
+    db.commit()
+    return None
+
+
+@app.get("/clasicos/{clasico_id}/estadisticas")
+def estadisticas_clasico(
+    clasico_id: int, competicion: Optional[str] = None, temporada: Optional[str] = None,
+    anio: Optional[int] = None, db: Session = Depends(get_db),
+):
+    """Detalle completo del clásico: estadísticas + historial cronológico, con
+    filtros por competición/edición/año. `ediciones` lista lo disponible sin filtrar."""
+    c = _clasico_o_404(db, clasico_id)
+    todos = _partidos_de_clasicos(db, [c])[c.id]
+    comp, temp = _k(competicion), _k(temporada)
+    filtrados = [
+        p for p in todos
+        if (not comp or _k(p.competicion) == comp)
+        and (not temp or _k(p.temporada) == temp)
+        and (not anio or p.fecha_partido.year == anio)
+    ]
+    ediciones = sorted({(p.competicion, p.temporada or "") for p in todos})
+    return {
+        **_base_clasico(c, _escudos(db, [c])),
+        **_stats_clasico(c, filtrados),
+        "ediciones": [{"competicion": n, "temporada": t} for n, t in ediciones],
+        "anios": sorted({p.fecha_partido.year for p in todos}, reverse=True),
     }
 
 

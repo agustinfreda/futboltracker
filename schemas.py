@@ -16,6 +16,22 @@ class EquipoResponse(EquipoBase):
         from_attributes = True
 
 
+# --- SCHEMAS CLÁSICO ---
+class ClasicoBase(BaseModel):
+    # Nombre personalizado (ej. "Superclásico", "Clásico de Avellaneda").
+    nombre: str
+    # Los dos clubes tienen que existir en la tabla de equipos.
+    equipo_a_id: int
+    equipo_b_id: int
+
+class ClasicoCreate(ClasicoBase):
+    pass
+
+# Se usa para editar (PUT): mismos campos que al crear.
+class ClasicoUpdate(ClasicoBase):
+    pass
+
+
 # --- SCHEMAS ESTADIO ---
 class EstadioBase(BaseModel):
     nombre: str
@@ -169,6 +185,9 @@ class PartidoResponse(PartidoBase):
     # partido ("ida" o "vuelta"), resultado del otro partido y marcador
     # global. None si el partido no forma parte de una llave.
     llave: Optional[dict] = None
+    # Si los dos equipos coinciden con un clásico registrado: {"id", "nombre"}.
+    # Se calcula al responder (en cualquier orden local/visitante), no se guarda.
+    clasico: Optional[dict] = None
 
     class Config:
         from_attributes = True

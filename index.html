@@ -66,6 +66,7 @@
                 <button onclick="cambiarTab('partidos')" id="tab-partidos" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-tv mr-2"></i>Partidos Vistos</button>
                 <button onclick="cambiarTab('jugadores')" id="tab-jugadores" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-users mr-2"></i>Jugadores</button>
                 <button onclick="cambiarTab('dts')" id="tab-dts" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-user-tie mr-2"></i>DTs</button>
+                <button onclick="cambiarTab('clasicos')" id="tab-clasicos" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-fire mr-2"></i>Clásicos</button>
                 <button onclick="cambiarTab('estadisticas')" id="tab-estadisticas" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700 whitespace-nowrap"><i class="fa-solid fa-chart-line mr-2"></i>Estadísticas</button>
             </nav>
             <div class="flex items-center gap-2 order-2 sm:order-3">
@@ -107,6 +108,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3"><div><label class="block text-[11px] text-slate-400 mb-1">Competición</label><select id="filtro-competicion" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Edición</label><select id="filtro-temporada" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Año</label><select id="filtro-anio" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Instancia</label><select id="filtro-instancia" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todas</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Equipo</label><select id="filtro-equipo" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div><label class="block text-[11px] text-slate-400 mb-1">Estadio</label><select id="filtro-estadio" onchange="aplicarFiltrosPartidos()" class="fld"><option value="">Todos</option></select></div><div class="relative"><label class="block text-[11px] text-slate-400 mb-1">DT</label><input type="text" id="filtro-dt" oninput="escribirDTFiltro(this.value)" onfocus="sugerirDTFiltro(this.value)" placeholder="Buscar DT..." autocomplete="off" class="fld"><div id="desplegable-dt-filtro" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-lg max-h-48 overflow-y-auto hidden z-20 shadow-2xl"></div></div><div><label class="block text-[11px] text-slate-400 mb-1">Desde</label><input type="date" id="filtro-desde" onchange="aplicarFiltrosPartidos()" class="fld"></div><div><label class="block text-[11px] text-slate-400 mb-1">Hasta</label><input type="date" id="filtro-hasta" onchange="aplicarFiltrosPartidos()" class="fld"></div><div><label class="block text-[11px] text-slate-400 mb-1">Orden</label><select id="filtro-orden" onchange="aplicarFiltrosPartidos()" class="fld"><option value="reciente">Más recientes primero</option><option value="antiguo">Más antiguos primero</option></select></div></div>
                 <div class="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-700/60">
                     <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" id="filtro-penales" onchange="aplicarFiltrosPartidos()" class="rounded border-slate-600 text-emerald-500 focus:ring-emerald-500"> Solo definidos por penales</label>
+                    <div class="flex items-center gap-2"><label for="filtro-clasico" class="text-xs text-slate-300"><i class="fa-solid fa-fire text-amber-400 mr-1"></i>Clásicos</label><select id="filtro-clasico" onchange="aplicarFiltrosPartidos()" class="fld !w-auto !py-1.5"><option value="">Todos los partidos</option><option value="solo">Solo clásicos</option></select></div>
                     <button onclick="limpiarFiltrosPartidos()" id="btn-limpiar-partidos" class="text-xs text-slate-400 hover:text-ink underline">Limpiar filtros</button>
                 </div>
             </div>
@@ -205,6 +207,28 @@
                 </div>
                 <div id="dts-stats-root" class="space-y-4"><p class="text-sm text-slate-400">Cargando estadísticas…</p></div>
             </div>
+        </section>
+
+        <!-- ================= PESTAÑA CLÁSICOS ================= -->
+        <section id="sec-clasicos" class="space-y-4 hidden">
+            <div class="card !p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div><h2 class="font-display text-3xl font-bold text-ink leading-none">Clásicos</h2><p id="cnt-clasicos" class="text-xs text-slate-400 mt-1.5">Cargando…</p></div>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <div class="flex gap-1 bg-slate-900 rounded-lg p-1">
+                        <button onclick="clasicosVista('tarjetas')" id="clasicos-sub-tarjetas" class="px-3 py-1.5 rounded-md text-xs font-medium bg-emerald-500 text-white"><i class="fa-solid fa-fire mr-1.5"></i>Clásicos</button>
+                        <button onclick="clasicosVista('comparar')" id="clasicos-sub-comparar" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-300"><i class="fa-solid fa-scale-balanced mr-1.5"></i>Rankings y comparación</button>
+                    </div>
+                    <button onclick="abrirModalClasico()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap"><i class="fa-solid fa-plus mr-1.5"></i>Nuevo clásico</button>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 card !p-3">
+                <i class="fa-solid fa-filter text-slate-500 text-xs ml-1"></i>
+                <select id="clasicos-filtro-competicion" onchange="cargarClasicos()" class="fld !w-auto !py-1.5"><option value="">Todas las competiciones</option></select>
+                <select id="clasicos-filtro-temporada" onchange="cargarClasicos()" class="fld !w-auto !py-1.5"><option value="">Todas las ediciones</option></select>
+                <button onclick="limpiarFiltrosClasicos()" class="text-xs text-slate-400 hover:text-ink ml-1 underline">Limpiar filtros</button>
+            </div>
+            <p class="text-[11px] text-slate-500 px-1">Elegí dos clubes y un nombre. Todos los partidos entre ellos (sea quien sea el local) se marcan solos como clásico, también al editarlos. Los filtros acomodan las estadísticas de las tarjetas.</p>
+            <div id="clasicos-root" class="space-y-4"><p class="text-sm text-slate-400">Cargando clásicos…</p></div>
         </section>
 
 </main>
@@ -723,6 +747,38 @@
         </div>
     </div>
 
+    <!-- MODAL: CREAR / EDITAR CLÁSICO -->
+    <div id="modal-clasico" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalClasico()" class="absolute top-4 right-4 text-slate-400 hover:text-ink" aria-label="Cerrar"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <h3 class="text-lg font-bold text-ink flex items-center"><i class="fa-solid fa-fire text-amber-400 mr-2"></i><span id="modal-clasico-titulo">Nuevo clásico</span></h3>
+            <form onsubmit="guardarClasico(event)" class="space-y-3">
+                <input type="hidden" id="c-edit-id" value="">
+                <div><label class="block text-xs font-medium text-slate-400 mb-1">Nombre del clásico</label>
+                    <input type="text" id="c-nombre" required maxlength="150" placeholder="Ej. Superclásico, Clásico de Avellaneda, Clásico rosarino" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-emerald-500"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="block text-xs font-medium text-slate-400 mb-1">Primer equipo</label><select id="c-equipo-a" required class="fld !py-2 !text-sm"></select></div>
+                    <div><label class="block text-xs font-medium text-slate-400 mb-1">Segundo equipo</label><select id="c-equipo-b" required class="fld !py-2 !text-sm"></select></div>
+                </div>
+                <p class="text-[11px] text-slate-500">Solo se pueden elegir clubes ya registrados. El orden no importa: River-Boca y Boca-River son el mismo clásico, y no se puede registrar dos veces.</p>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">Guardar clásico</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLE / ESTADÍSTICAS DE UN CLÁSICO -->
+    <div id="modal-clasico-detalle" class="fixed inset-0 bg-black/80 flex items-start sm:items-center justify-center p-3 sm:p-4 hidden z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <button onclick="cerrarDetalleClasico()" class="absolute top-4 right-4 text-slate-400 hover:text-ink z-10" aria-label="Cerrar"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div class="flex flex-wrap items-center gap-3 mb-4 pr-8">
+                <i class="fa-solid fa-filter text-slate-500 text-xs"></i>
+                <select id="cd-comp" onchange="cambiaCompDetalle()" class="fld !w-auto !py-1.5"><option value="">Todas las competiciones</option></select>
+                <select id="cd-temp" onchange="cargarDetalleClasico()" class="fld !w-auto !py-1.5"><option value="">Todas las ediciones</option></select>
+            </div>
+            <div id="cd-root"></div>
+        </div>
+    </div>
+
     <script>
         // Vacío = URL relativa: el navegador le pega al mismo origen que
         // sirvió esta página (funciona igual en localhost que en Render,
@@ -809,6 +865,7 @@
             if (tab === 'jugadores') cargarJugadores();
             if (tab === 'estadisticas') cargarEstadisticas();
             if (tab === 'dts') dtsVista(dtsVistaActual);
+            if (tab === 'clasicos') cargarClasicos();
         }
 
         // --- EQUIPOS ---
@@ -1476,7 +1533,7 @@
             // partidos se pintan apenas llegan, sin esperar a las listas de los filtros.
             if (partidosMemoria.length) renderPartidos(partidosMemoria); // al volver a la pestaña, se ve al instante
             const listas = Promise.all([
-                cargarEquipos(), cargarCompeticiones(), cargarInstancias(),
+                cargarEquipos(), cargarCompeticiones(), cargarInstancias(), cargarClasicosLista(),
                 fetch(`${API_URL}/estadios/`).then(r => r.json()).then(d => { estadiosMemoria = d; }).catch(() => { estadiosMemoria = []; }),
                 fetch(`${API_URL}/partidos/anios-disponibles`).then(r => r.json()).then(d => { anioOpcionesCache = d; }).catch(() => { anioOpcionesCache = []; })
             ]).then(poblarFiltrosPartidos);
@@ -1523,6 +1580,8 @@
             if (q) params.set('q', q);
             Object.entries(FILTROS_PARTIDOS).forEach(([k, id]) => { const v = document.getElementById(id).value; if (v) params.set(k, v); });
             if (document.getElementById('filtro-penales').checked) params.set('penales', 'true');
+            const cl = document.getElementById('filtro-clasico').value;
+            if (cl === 'solo') params.set('solo_clasicos', 'true'); else if (cl) params.set('clasico_id', cl);
             return params;
         }
 
@@ -1617,10 +1676,11 @@
                                 </button>` : '';
 
                 contenedor.innerHTML += `
-                    <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg flex flex-col">
+                    <div class="bg-slate-800 border ${p.clasico ? 'border-amber-400/50' : 'border-slate-700'} rounded-xl p-4 shadow-lg flex flex-col">
                         <div class="flex justify-between items-start gap-2 mb-3">
                             <div class="min-w-0">
                                 <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}${p.temporada ? ' ' + p.temporada : ''}</span>
+                                ${p.clasico ? `<div class="mt-1.5">${badgeClasico(p.clasico)}</div>` : ''}
                                 <p class="text-[11px] text-slate-400 mt-1 truncate">${p.instancia} • ${p.fecha_partido}</p>
                             </div>
                             <div class="flex items-center gap-2.5 shrink-0">${botonVuelta}
@@ -1683,6 +1743,7 @@
 
         // Puebla los desplegables con las listas maestras (no solo con la página visible).
         function poblarFiltrosPartidos() {
+            poblarFiltroClasico();
             const opciones = {
                 'filtro-competicion': [...new Set(competicionesMemoria.map(c => c.nombre))].sort(),
                 'filtro-temporada': [...new Set(competicionesMemoria.map(c => c.temporada).filter(Boolean))].sort().reverse(),
@@ -1755,6 +1816,7 @@
             document.getElementById('filtro-partidos').value = '';
             Object.values(FILTROS_PARTIDOS).forEach(id => document.getElementById(id).value = '');
             document.getElementById('filtro-penales').checked = false;
+            document.getElementById('filtro-clasico').value = '';
             document.getElementById('filtro-orden').value = 'reciente';
             recargarPartidos();
         }
@@ -2411,7 +2473,7 @@
             return `<div class="scoreboard rounded-2xl p-6 md:p-8 h-full">
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs muted">
                     <span class="font-semibold px-2.5 py-1 rounded-full" style="background:#0d3a28;color:#6ee7b7">${esc(p.competicion)}${p.temporada ? ' ' + esc(p.temporada) : ''}</span>
-                    <span>${esc(p.instancia)}</span><span>${fechaCorta(p.fecha_partido)}</span></div>
+                    <span>${esc(p.instancia)}</span><span>${fechaCorta(p.fecha_partido)}</span>${p.clasico ? `<span class="font-semibold px-2.5 py-1 rounded-full" style="background:#3a2a0d;color:#fbbf24"><i class="fa-solid fa-fire mr-1"></i>${esc(p.clasico.nombre)}</span>` : ''}</div>
                 <div class="grid grid-cols-[1fr_auto_1fr] items-start gap-3 md:gap-6 mt-7">
                     <div class="text-right"><p class="font-display text-2xl md:text-4xl font-bold leading-tight">${esc(p.equipo_local)}</p>${dt(p.dt_local)}${lista(gl, 'text-right')}</div>
                     <p class="font-display text-6xl md:text-8xl font-extrabold leading-none tabular-nums">${gl.length}<span class="muted mx-2 md:mx-3">-</span>${gv.length}</p>
@@ -2443,7 +2505,7 @@
                         <span class="text-right text-ink font-semibold break-words">${esc(u.local)}</span>
                         <span class="font-display text-3xl font-bold text-emerald-400 tabular-nums">${u.gl}-${u.gv}</span>
                         <span class="text-left text-ink font-semibold break-words">${esc(u.visitante)}</span></div>
-                    <p class="text-xs text-slate-400 mt-1.5">${esc(u.competicion)}${u.temporada ? ' ' + esc(u.temporada) : ''} · ${esc(u.instancia)} · ${fechaCorta(u.fecha)}</p></li>`).join('');
+                    <p class="text-xs text-slate-400 mt-1.5">${esc(u.competicion)}${u.temporada ? ' ' + esc(u.temporada) : ''} · ${esc(u.instancia)} · ${fechaCorta(u.fecha)}${u.clasico ? ` · <span class="text-amber-400 font-semibold"><i class="fa-solid fa-fire mr-1"></i>${esc(u.clasico.nombre)}</span>` : ''}</p></li>`).join('');
 
             root.innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -2536,6 +2598,7 @@
             if (anio) params.set('anio', anio);
             const qs = params.toString() ? `?${params}` : '';
             const qsTodos = `?${new URLSearchParams([...params, ['limit', '1000']])}`;
+            const pClasicos = fetch(`${API_URL}/clasicos/panel${qs}`).then(r => r.ok ? r.json() : null).catch(() => null);
             let a, goleadores, estadios, tipos;
             try {
                 [a, goleadores, estadios, tipos] = await Promise.all([
@@ -2546,6 +2609,7 @@
                 root.innerHTML = tarjeta('No se pudieron cargar las estadísticas', 'fa-triangle-exclamation', 'text-amber-400', vacio('Revisá que el servidor esté corriendo con el main.py actualizado.'));
                 return;
             }
+            const panelClasicos = await pClasicos;
             const t = a.goles_por_tiempo, totT = t.primero + t.segundo + t.prorroga;
             const pct = x => totT ? Math.round(x / totT * 100) : 0;
             const minuto = columnas(a.goles_por_minuto, 'bg-rose-400') + (totT ? `<p class="text-[11px] text-slate-400 mt-3">1.º tiempo ${pct(t.primero)}% · 2.º tiempo ${pct(t.segundo)}%${t.prorroga ? ` · prórroga ${pct(t.prorroga)}%` : ''}</p>` : '');
@@ -2578,9 +2642,11 @@
                     ${tarjeta('Estadios más visitados', 'fa-location-dot', 'text-sky-400', ranking(estadios.map(e => ({ nombre: e.estadio, valor: e.total_partidos })), { unidad: ['partido', 'partidos'], color: 'bg-sky-400', vacioMsg: 'Sin estadios cargados en los partidos.' }))}
                     ${tarjeta('Partidos por día de la semana', 'fa-calendar-week', 'text-sky-400', columnas(a.por_dia_semana, 'bg-sky-400'))}
                     ${tarjeta('Partidos por instancia', 'fa-flag-checkered', 'text-emerald-400', ranking(a.partidos_por_instancia, { unidad: ['partido', 'partidos'], color: 'bg-emerald-400' }))}
-                </div>`;
+                </div>
+                ${panelClasicos ? `<h2 class="font-display text-2xl font-bold text-ink pt-2 flex items-center gap-2"><i class="fa-solid fa-fire text-amber-400 text-xl"></i>Clásicos</h2>${clasicosPanelHTML(panelClasicos, 'st')}` : ''}`;
             tablaEquiposData = a.tabla_equipos;
             renderTablaEquipos();
+            if (panelClasicos) renderComparacionClasicos('st');
         }
 
         // ================= PESTAÑA DTs =================
@@ -2903,6 +2969,327 @@
             };
             img.onerror = () => { URL.revokeObjectURL(url); alert('No se pudo leer esa imagen.'); };
             img.src = url;
+        }
+
+        // ================= PESTAÑA CLÁSICOS =================
+        // Un clásico es un par de clubes con nombre propio. Los partidos se marcan solos
+        // (el backend compara local/visitante con el par, en cualquier orden).
+        let clasicosMemoria = [];          // lista liviana (nombre + equipos): filtro de Partidos y selects
+        let clasicosVistaActual = 'tarjetas';
+        let clasicoDetalleId = null;
+        let clasicoEdiciones = [];
+        let filtrosClasicosCargados = false;
+        const clasicosPanelDatos = {}, clasicosSort = {};
+
+        async function cargarClasicosLista() {
+            try {
+                const res = await fetch(`${API_URL}/clasicos/?estadisticas=false`);
+                clasicosMemoria = res.ok ? await res.json() : [];
+            } catch (e) { clasicosMemoria = []; }
+        }
+
+        function poblarFiltroClasico() {
+            const sel = document.getElementById('filtro-clasico');
+            if (!sel) return;
+            const previo = sel.value;
+            sel.innerHTML = '<option value="">Todos los partidos</option><option value="solo">Solo clásicos</option>' +
+                clasicosMemoria.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+            if ([...sel.options].some(o => o.value === previo)) sel.value = previo;
+        }
+
+        // Etiqueta visual de clásico (listados de partidos, inicio).
+        const badgeClasico = c => !c ? '' :
+            `<button type="button" onclick="verPartidosClasico(${c.id})" title="Ver todos los partidos de este clásico" class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-amber-400 bg-amber-400/10 border border-amber-400/40 px-2 py-0.5 rounded-full whitespace-nowrap hover:bg-amber-400/20 transition-colors"><i class="fa-solid fa-fire"></i>${esc(c.nombre)}</button>`;
+
+        async function verPartidosClasico(id) {
+            cerrarDetalleClasico();
+            if (!clasicosMemoria.some(c => c.id === id)) await cargarClasicosLista();
+            poblarFiltroClasico();
+            document.getElementById('filtro-clasico').value = String(id);
+            cambiarTab('partidos');
+        }
+
+        function clasicosVista(v) {
+            clasicosVistaActual = v;
+            [['tarjetas', 'clasicos-sub-tarjetas'], ['comparar', 'clasicos-sub-comparar']].forEach(([k, id]) => {
+                const b = document.getElementById(id);
+                b.classList.toggle('bg-emerald-500', k === v);
+                b.classList.toggle('text-white', k === v);
+                b.classList.toggle('text-slate-300', k !== v);
+            });
+            cargarClasicos();
+        }
+
+        async function poblarFiltrosClasicos() {
+            if (filtrosClasicosCargados) return;
+            try {
+                const comps = await fetch(`${API_URL}/competiciones/`).then(r => r.json());
+                const nombres = [...new Set(comps.map(c => c.nombre))].sort();
+                const temps = [...new Set(comps.map(c => c.temporada).filter(Boolean))].sort().reverse();
+                document.getElementById('clasicos-filtro-competicion').innerHTML = '<option value="">Todas las competiciones</option>' + nombres.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+                document.getElementById('clasicos-filtro-temporada').innerHTML = '<option value="">Todas las ediciones</option>' + temps.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+                filtrosClasicosCargados = true;
+            } catch (e) { /* quedan en "Todas" */ }
+        }
+
+        function limpiarFiltrosClasicos() {
+            document.getElementById('clasicos-filtro-competicion').value = '';
+            document.getElementById('clasicos-filtro-temporada').value = '';
+            cargarClasicos();
+        }
+
+        function paramsClasicos() {
+            const p = new URLSearchParams();
+            const comp = document.getElementById('clasicos-filtro-competicion').value;
+            const temp = document.getElementById('clasicos-filtro-temporada').value;
+            if (comp) p.set('competicion', comp);
+            if (temp) p.set('temporada', temp);
+            return p;
+        }
+
+        let seqClasicos = 0;
+        async function cargarClasicos() {
+            await poblarFiltrosClasicos();
+            const seq = ++seqClasicos;
+            const root = document.getElementById('clasicos-root');
+            const params = paramsClasicos();
+            const qs = params.toString() ? `?${params}` : '';
+            try {
+                if (clasicosVistaActual === 'comparar') {
+                    const d = await apiRequest(`${API_URL}/clasicos/panel${qs}`);
+                    if (seq !== seqClasicos) return;
+                    document.getElementById('cnt-clasicos').textContent = `${plural(d.total_clasicos, 'clásico registrado', 'clásicos registrados')} · ${plural(d.partidos_clasicos, 'partido', 'partidos')}${params.toString() ? ' con los filtros aplicados' : ''}`;
+                    root.innerHTML = clasicosPanelHTML(d, 'cl');
+                    renderComparacionClasicos('cl');
+                } else {
+                    const lista = await apiRequest(`${API_URL}/clasicos/${qs}`);
+                    if (seq !== seqClasicos) return;
+                    clasicosMemoria = lista.map(c => ({ id: c.id, nombre: c.nombre, equipo_a: c.equipo_a, equipo_b: c.equipo_b }));
+                    document.getElementById('cnt-clasicos').textContent = `${plural(lista.length, 'clásico registrado', 'clásicos registrados')}${params.toString() ? ' · estadísticas con los filtros aplicados' : ''}`;
+                    root.innerHTML = lista.length
+                        ? `<div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">${lista.map(tarjetaClasicoHTML).join('')}</div>`
+                        : tarjeta('Todavía no hay clásicos', 'fa-fire', 'text-amber-400', `<p class="text-sm text-slate-300 mb-4">Registrá un enfrentamiento entre dos clubes (por ejemplo, Superclásico) y los partidos entre ellos se van a marcar solos.</p><button onclick="abrirModalClasico()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"><i class="fa-solid fa-plus mr-1.5"></i>Nuevo clásico</button>`);
+                }
+            } catch (e) {
+                root.innerHTML = tarjeta('No se pudieron cargar los clásicos', 'fa-triangle-exclamation', 'text-amber-400', vacio('Revisá que el servidor esté corriendo con el main.py actualizado.'));
+            }
+        }
+
+        // Barra A / empates / B
+        function barraResultadosClasico(a, e, b) {
+            const t = a + e + b;
+            if (!t) return '<div class="h-2 rounded-full bg-slate-900"></div>';
+            return `<div class="flex h-2 rounded-full overflow-hidden bg-slate-900">
+                <div class="bg-emerald-400" style="width:${a / t * 100}%"></div><div class="bg-amber-400" style="width:${e / t * 100}%"></div><div class="bg-sky-400" style="width:${b / t * 100}%"></div></div>`;
+        }
+        const resClasico = r => `${esc(r.local)} ${r.gl}-${r.gv} ${esc(r.visitante)}${r.penales_ganador ? ` <span class="text-amber-400">(pen. ${esc(r.penales_ganador)})</span>` : ''}`;
+
+        function tarjetaClasicoHTML(c) {
+            const [A, B] = c.equipos;
+            const ult = c.ultimo;
+            const editar = attrJSON({ id: c.id, nombre: c.nombre, a: c.equipo_a.id, b: c.equipo_b.id });
+            return `<div class="card !p-4 flex flex-col gap-3 hover:border-amber-400/50 transition-colors">
+                <div class="flex items-start justify-between gap-2">
+                    <h3 class="font-display text-2xl font-bold text-ink leading-tight min-w-0 break-words"><i class="fa-solid fa-fire text-amber-400 mr-1.5 text-lg"></i>${esc(c.nombre)}</h3>
+                    <div class="flex items-center gap-2.5 shrink-0 pt-1">
+                        <button onclick='abrirModalClasico(${editar})' title="Editar clásico" class="text-slate-500 hover:text-emerald-400 transition-colors"><i class="fa-solid fa-pen text-xs"></i></button>
+                        <button onclick='borrarClasico(${c.id}, ${attrJSON(c.nombre)})' title="Borrar clásico" class="text-slate-500 hover:text-red-400 transition-colors"><i class="fa-solid fa-trash text-xs"></i></button>
+                    </div></div>
+                <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                    <div class="flex flex-col items-center gap-1.5 text-center min-w-0">${escudoHTML(c.equipo_a, 'w-14 h-14')}<p class="text-xs font-semibold text-ink leading-tight break-words">${esc(c.equipo_a.nombre)}</p></div>
+                    <span class="text-[11px] font-bold text-slate-500">VS</span>
+                    <div class="flex flex-col items-center gap-1.5 text-center min-w-0">${escudoHTML(c.equipo_b, 'w-14 h-14')}<p class="text-xs font-semibold text-ink leading-tight break-words">${esc(c.equipo_b.nombre)}</p></div></div>
+                <div class="grid grid-cols-3 text-center">
+                    <div><p class="font-display text-3xl font-bold text-emerald-400 tabular-nums leading-none">${A.g}</p><p class="text-[10px] text-slate-400 mt-1">victorias</p></div>
+                    <div><p class="font-display text-3xl font-bold text-amber-400 tabular-nums leading-none">${c.empates}</p><p class="text-[10px] text-slate-400 mt-1">empates</p></div>
+                    <div><p class="font-display text-3xl font-bold text-sky-400 tabular-nums leading-none">${B.g}</p><p class="text-[10px] text-slate-400 mt-1">victorias</p></div></div>
+                ${barraResultadosClasico(A.g, c.empates, B.g)}
+                <div class="flex justify-between text-[11px] text-slate-400"><span>${A.gf} goles</span><span class="text-slate-500">${plural(c.total, 'enfrentamiento', 'enfrentamientos')}</span><span>${B.gf} goles</span></div>
+                <p class="text-[11px] text-slate-400 bg-slate-900/60 border border-slate-700/50 rounded-lg px-2.5 py-1.5 truncate">${ult ? `<i class="fa-solid fa-clock-rotate-left mr-1.5 text-slate-500"></i>Último (${fechaCorta(ult.fecha)}): ${resClasico(ult)}` : 'Todavía no hay partidos registrados entre estos clubes.'}</p>
+                <div class="grid grid-cols-2 gap-2 mt-auto pt-1">
+                    <button onclick="abrirDetalleClasico(${c.id})" class="text-xs bg-slate-700 hover:bg-slate-600 text-ink px-3 py-2 rounded-lg transition-colors"><i class="fa-solid fa-chart-column mr-1.5 text-amber-400"></i>Estadísticas</button>
+                    <button onclick="verPartidosClasico(${c.id})" class="text-xs bg-slate-700 hover:bg-slate-600 text-ink px-3 py-2 rounded-lg transition-colors"><i class="fa-solid fa-tv mr-1.5 text-emerald-400"></i>Ver partidos</button></div>
+            </div>`;
+        }
+
+        // ----- Crear / editar -----
+        async function abrirModalClasico(c) {
+            await cargarEquipos();
+            const opts = '<option value="">Elegí un equipo…</option>' + [...equiposMemoria].sort((x, y) => x.nombre.localeCompare(y.nombre)).map(e => `<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
+            ['c-equipo-a', 'c-equipo-b'].forEach(id => document.getElementById(id).innerHTML = opts);
+            document.getElementById('c-edit-id').value = c ? c.id : '';
+            document.getElementById('c-nombre').value = c ? c.nombre : '';
+            document.getElementById('c-equipo-a').value = c ? c.a : '';
+            document.getElementById('c-equipo-b').value = c ? c.b : '';
+            document.getElementById('modal-clasico-titulo').textContent = c ? 'Editar clásico' : 'Nuevo clásico';
+            document.getElementById('modal-clasico').classList.remove('hidden');
+        }
+        function cerrarModalClasico() { document.getElementById('modal-clasico').classList.add('hidden'); }
+
+        async function guardarClasico(e) {
+            e.preventDefault();
+            const id = document.getElementById('c-edit-id').value;
+            const a = document.getElementById('c-equipo-a').value, b = document.getElementById('c-equipo-b').value;
+            if (!a || !b) return alert('Elegí los dos equipos del clásico.');
+            try {
+                await apiRequest(`${API_URL}/clasicos/${id || ''}`, {
+                    method: id ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre: document.getElementById('c-nombre').value, equipo_a_id: +a, equipo_b_id: +b })
+                });
+            } catch (err) { return; /* el mensaje ya se mostró en apiRequest */ }
+            cerrarModalClasico();
+            await cargarClasicosLista();
+            if (clasicoDetalleId) cargarDetalleClasico();
+            cargarClasicos();
+        }
+
+        async function borrarClasico(id, nombre) {
+            if (!confirmarBorrado(`¿Borrar el clásico «${nombre}»? Los partidos NO se borran: solo dejan de marcarse como clásico.`)) return;
+            try { await apiRequest(`${API_URL}/clasicos/${id}`, { method: 'DELETE' }); } catch (err) { return; }
+            await cargarClasicosLista();
+            cargarClasicos();
+        }
+
+        // ----- Detalle: estadísticas + historial -----
+        function abrirDetalleClasico(id) {
+            clasicoDetalleId = id;
+            clasicoEdiciones = [];
+            document.getElementById('cd-comp').innerHTML = '<option value="">Todas las competiciones</option>';
+            document.getElementById('cd-temp').innerHTML = '<option value="">Todas las ediciones</option>';
+            document.getElementById('cd-root').innerHTML = '<p class="text-sm text-slate-400">Cargando…</p>';
+            document.getElementById('modal-clasico-detalle').classList.remove('hidden');
+            cargarDetalleClasico(true);
+        }
+        function cerrarDetalleClasico() {
+            document.getElementById('modal-clasico-detalle').classList.add('hidden');
+            clasicoDetalleId = null;
+        }
+
+        function poblarEdicionesDetalle(resetTemp) {
+            const comp = document.getElementById('cd-comp').value;
+            const temps = [...new Set(clasicoEdiciones.filter(e => !comp || e.competicion === comp).map(e => e.temporada).filter(Boolean))].sort().reverse();
+            const sel = document.getElementById('cd-temp'), previo = sel.value;
+            sel.innerHTML = '<option value="">Todas las ediciones</option>' + temps.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+            if (!resetTemp && temps.includes(previo)) sel.value = previo;
+        }
+        function cambiaCompDetalle() { poblarEdicionesDetalle(true); cargarDetalleClasico(); }
+
+        async function cargarDetalleClasico(primera) {
+            const id = clasicoDetalleId;
+            if (!id) return;
+            const p = new URLSearchParams();
+            const comp = document.getElementById('cd-comp').value, temp = document.getElementById('cd-temp').value;
+            if (comp) p.set('competicion', comp);
+            if (temp) p.set('temporada', temp);
+            let d;
+            try { d = await apiRequest(`${API_URL}/clasicos/${id}/estadisticas${p.toString() ? '?' + p : ''}`); }
+            catch (e) { cerrarDetalleClasico(); return; }
+            if (id !== clasicoDetalleId) return;
+            if (primera || !clasicoEdiciones.length) {
+                clasicoEdiciones = d.ediciones;
+                const sel = document.getElementById('cd-comp');
+                sel.innerHTML = '<option value="">Todas las competiciones</option>' + [...new Set(d.ediciones.map(e => e.competicion))].sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+                poblarEdicionesDetalle(true);
+            }
+            document.getElementById('cd-root').innerHTML = detalleClasicoHTML(d);
+        }
+
+        function detalleClasicoHTML(d) {
+            const [A, B] = d.equipos;
+            const tdn = (v, cls = '') => `<td class="px-2 py-1.5 text-right tabular-nums ${cls}">${v}</td>`;
+            const cab = `<div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">${escudoHTML(d.equipo_a, 'w-12 h-12 shrink-0')}<span class="text-slate-500 text-xs font-bold">VS</span>${escudoHTML(d.equipo_b, 'w-12 h-12 shrink-0')}
+                    <div class="min-w-0"><h3 class="font-display text-2xl font-bold text-ink leading-none break-words"><i class="fa-solid fa-fire text-amber-400 mr-1.5 text-lg"></i>${esc(d.nombre)}</h3><p class="text-xs text-slate-400 mt-1">${esc(A.nombre)} · ${esc(B.nombre)}</p></div></div>
+                <button onclick="verPartidosClasico(${d.id})" class="btn-ghost"><i class="fa-solid fa-tv text-emerald-400"></i>Ver todos los partidos</button></div>`;
+            if (!d.total) return cab + `<div class="mt-4">${vacio('No hay partidos registrados entre estos clubes con los filtros elegidos.')}</div>`;
+
+            const kpis = `<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                ${kpi(NUM(d.total), 'Enfrentamientos', `${NUM(d.goles_total)} goles · ${d.promedio_goles} por partido`)}
+                ${kpi(`<span class="text-emerald-400">${A.g}</span>`, `Victorias de ${esc(A.nombre)}`, A.pen_g ? `${A.pen_g} por penales tras empatar` : '')}
+                ${kpi(`<span class="text-amber-400">${d.empates}</span>`, d.empates === 1 ? 'Empate' : 'Empates')}
+                ${kpi(`<span class="text-sky-400">${B.g}</span>`, `Victorias de ${esc(B.nombre)}`, B.pen_g ? `${B.pen_g} por penales tras empatar` : '')}</div>
+                <div class="mt-3">${barraResultadosClasico(A.g, d.empates, B.g)}</div>
+                <p class="text-[11px] text-slate-500 mt-1.5">Victoria y empate se cuentan por el marcador; si un empate se definió por penales cuenta como empate.</p>`;
+
+            const equipos = `<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-slate-400 text-right border-b border-slate-700">
+                <th class="px-2 py-1.5 text-left font-medium">Equipo</th><th class="px-2 py-1.5 font-medium">G</th><th class="px-2 py-1.5 font-medium">E</th><th class="px-2 py-1.5 font-medium">P</th><th class="px-2 py-1.5 font-medium">GF</th><th class="px-2 py-1.5 font-medium">GC</th><th class="px-2 py-1.5 font-medium">DG</th><th class="px-2 py-1.5 font-medium" title="Más victorias seguidas">Mejor racha</th><th class="px-2 py-1.5 font-medium" title="Victorias seguidas hasta el último partido">Racha actual</th></tr></thead><tbody>` +
+                [A, B].map(t => `<tr class="border-b border-slate-700/50 last:border-0"><td class="px-2 py-1.5 text-ink font-medium">${esc(t.nombre)}</td>${tdn(t.g, 'text-emerald-400')}${tdn(t.e, 'text-amber-400')}${tdn(t.p, 'text-red-400')}${tdn(t.gf)}${tdn(t.gc)}${tdn(t.dg > 0 ? '+' + t.dg : t.dg)}${tdn(t.mejor_racha)}${tdn(t.racha_actual)}</tr>`).join('') + '</tbody></table></div>';
+
+            const filasLV = [A, B].flatMap(t => [['local', 'Local'], ['visitante', 'Visitante']].map(([k, et]) => {
+                const x = t[k];
+                return `<tr class="border-b border-slate-700/50 last:border-0"><td class="px-2 py-1.5 text-ink">${esc(t.nombre)} <span class="text-slate-500">como ${et.toLowerCase()}</span></td>${tdn(x.pj)}${tdn(x.g, 'text-emerald-400')}${tdn(x.e, 'text-amber-400')}${tdn(x.p, 'text-red-400')}${tdn(x.gf)}${tdn(x.gc)}</tr>`;
+            })).join('');
+            const localVisitante = `<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-slate-400 text-right border-b border-slate-700">
+                <th class="px-2 py-1.5 text-left font-medium">Condición</th><th class="px-2 py-1.5 font-medium">PJ</th><th class="px-2 py-1.5 font-medium">G</th><th class="px-2 py-1.5 font-medium">E</th><th class="px-2 py-1.5 font-medium">P</th><th class="px-2 py-1.5 font-medium">GF</th><th class="px-2 py-1.5 font-medium">GC</th></tr></thead><tbody>${filasLV}</tbody></table></div>`;
+
+            const reg = [];
+            if (d.ultimo) reg.push(recordFila('fa-clock-rotate-left', resClasico(d.ultimo), `Último enfrentamiento · ${fechaCorta(d.ultimo.fecha)} · ${esc(d.ultimo.competicion)}${d.ultimo.temporada ? ' ' + esc(d.ultimo.temporada) : ''}`));
+            if (d.mayor_diferencia) reg.push(recordFila('fa-arrows-left-right', resClasico(d.mayor_diferencia), `Mayor diferencia de goles (${d.mayor_diferencia.diferencia}) · ${fechaCorta(d.mayor_diferencia.fecha)}`));
+            if (d.mas_goles) reg.push(recordFila('fa-futbol', resClasico(d.mas_goles), `Más goles en un enfrentamiento (${d.mas_goles.goles}) · ${fechaCorta(d.mas_goles.fecha)}`));
+
+            const aMin = A.nombre.trim().toLowerCase();
+            const forma = d.historial.map(r => {
+                const ga = r.local.trim().toLowerCase() === aMin ? r.gl : r.gv, gb = r.local.trim().toLowerCase() === aMin ? r.gv : r.gl;
+                return `<span class="w-3 h-3 rounded-sm ${ga > gb ? 'bg-emerald-400' : ga < gb ? 'bg-sky-400' : 'bg-amber-400'}" title="${fechaCorta(r.fecha)}: ${esc(r.local)} ${r.gl}-${r.gv} ${esc(r.visitante)}"></span>`;
+            }).join('');
+            const hist = d.historial.map(r => {
+                const ga = r.local.trim().toLowerCase() === aMin ? r.gl : r.gv, gb = r.local.trim().toLowerCase() === aMin ? r.gv : r.gl;
+                const color = ga > gb ? 'bg-emerald-400' : ga < gb ? 'bg-sky-400' : 'bg-amber-400';
+                return `<li class="flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0 text-xs">
+                    <span class="w-2 h-2 rounded-full ${color} shrink-0"></span>
+                    <span class="text-slate-400 tabular-nums w-24 shrink-0">${fechaCorta(r.fecha)}</span>
+                    <span class="text-ink font-medium min-w-0 flex-1 break-words">${resClasico(r)}</span>
+                    <span class="text-slate-500 hidden sm:block text-right">${esc(r.competicion)}${r.temporada ? ' ' + esc(r.temporada) : ''} · ${esc(r.instancia)}</span></li>`;
+            }).join('');
+
+            return cab + kpis + `
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                    ${tarjeta('Balance y rachas', 'fa-table-list', 'text-emerald-400', equipos)}
+                    ${tarjeta('Local y visitante', 'fa-house-flag', 'text-sky-400', localVisitante)}
+                    ${tarjeta('Récords del clásico', 'fa-medal', 'text-yellow-400', `<ul class="space-y-3.5">${reg.join('')}</ul>`)}
+                    ${tarjeta('Forma histórica', 'fa-timeline', 'text-purple-400', `<div class="flex flex-wrap gap-1">${forma}</div><p class="text-[11px] text-slate-500 mt-3"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-400 align-middle mr-1"></span>${esc(A.nombre)} · <span class="inline-block w-2.5 h-2.5 rounded-sm bg-amber-400 align-middle mx-1"></span>empate · <span class="inline-block w-2.5 h-2.5 rounded-sm bg-sky-400 align-middle mx-1"></span>${esc(B.nombre)} (de más viejo a más nuevo)</p>`)}
+                </div>
+                <div class="mt-4">${tarjeta('Historial de enfrentamientos', 'fa-clock-rotate-left', 'text-emerald-400', `<ul class="max-h-80 overflow-y-auto pr-1">${hist}</ul>`)}</div>`;
+        }
+
+        // ----- Panel: ranking + comparación histórica (pestaña Clásicos y Estadísticas) -----
+        function clasicosPanelHTML(d, pre) {
+            if (!d.total_clasicos) return tarjeta('Clásicos', 'fa-fire', 'text-amber-400', vacio('Todavía no registraste clásicos. Creá el primero en la pestaña Clásicos.'));
+            clasicosPanelDatos[pre] = d;
+            const rank = ranking(d.ranking.map(r => ({ nombre: `${r.nombre} · ${r.detalle}`, valor: r.valor })), { unidad: ['partido', 'partidos'], color: 'bg-amber-400', scroll: true });
+            return `<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    ${kpi(NUM(d.total_clasicos), 'Clásicos registrados')}
+                    ${kpi(NUM(d.partidos_clasicos), 'Partidos de clásicos', `${d.pct_clasicos}% de los ${NUM(d.total_partidos)} partidos vistos`)}
+                    ${kpi(d.ranking[0] ? NUM(d.ranking[0].valor) : '—', 'Partidos del clásico más visto', d.ranking[0] ? esc(d.ranking[0].nombre) : '')}</div>
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                    ${tarjeta('Ranking por partidos registrados', 'fa-ranking-star', 'text-amber-400', rank)}
+                    ${tarjeta('Comparación histórica entre clásicos', 'fa-scale-balanced', 'text-purple-400', `<div id="${pre}-comparacion"></div><p class="text-[11px] text-slate-500 mt-3">Tocá un título de columna para ordenar. Victorias: primer club - empates - segundo club.</p>`, 'xl:col-span-2')}</div>`;
+        }
+
+        function ordenarComparacionClasicos(pre, col) {
+            const s = clasicosSort[pre] || { col: 'total', dir: -1 };
+            clasicosSort[pre] = { col, dir: s.col === col ? -s.dir : (col === 'nombre' ? 1 : -1) };
+            renderComparacionClasicos(pre);
+        }
+
+        function renderComparacionClasicos(pre) {
+            const cont = document.getElementById(`${pre}-comparacion`), d = clasicosPanelDatos[pre];
+            if (!cont || !d) return;
+            const s = clasicosSort[pre] || (clasicosSort[pre] = { col: 'total', dir: -1 });
+            const val = (f, c) => c === 'nombre' ? f.nombre.toLowerCase() : c === 'dif' ? (f.mayor_diferencia ? f.mayor_diferencia.diferencia : 0) : f[c];
+            const filas = [...d.comparacion].sort((a, b) => {
+                const x = val(a, s.col), y = val(b, s.col);
+                return (x < y ? -1 : x > y ? 1 : 0) * s.dir || a.nombre.localeCompare(b.nombre);
+            });
+            const th = (c, t, izq) => `<th class="px-2 py-1.5 font-medium ${izq ? 'text-left' : 'text-right'}"><button onclick="ordenarComparacionClasicos('${pre}','${c}')" class="hover:text-ink">${t}${s.col === c ? (s.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
+            const td = v => `<td class="px-2 py-2 text-right tabular-nums">${v}</td>`;
+            cont.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-slate-400 border-b border-slate-700">
+                ${th('nombre', 'Clásico', true)}${th('total', 'PJ')}<th class="px-2 py-1.5 font-medium text-right">Victorias</th>${th('pct_empates', '% emp.')}${th('goles_total', 'Goles')}${th('promedio_goles', 'Prom.')}${th('dif', 'Mayor dif.')}</tr></thead><tbody>` +
+                filas.map(f => `<tr class="border-b border-slate-700/50 last:border-0">
+                    <td class="px-2 py-2"><button onclick="abrirDetalleClasico(${f.id})" class="text-left hover:text-emerald-400"><span class="text-ink font-medium">${esc(f.nombre)}</span><br><span class="text-[10px] text-slate-500">${esc(f.equipo_a)} vs ${esc(f.equipo_b)}</span></button></td>
+                    ${td(f.total)}${td(`${f.ga}-${f.empates}-${f.gb}`)}${td(f.pct_empates + '%')}${td(f.goles_total)}${td(f.promedio_goles)}
+                    <td class="px-2 py-2 text-right tabular-nums">${f.mayor_diferencia ? `${f.mayor_diferencia.diferencia} <span class="text-slate-500">(${f.mayor_diferencia.gl}-${f.mayor_diferencia.gv})</span>` : '—'}</td></tr>`).join('') + '</tbody></table></div>';
         }
 
         aplicarTema(document.documentElement.dataset.theme);
