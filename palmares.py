@@ -10,7 +10,6 @@ Dos fuentes que se suman solas:
 Si cargás a mano un título que ya existe por una final (misma competición y
 temporada, mismo club), no se cuenta doble: gana el manual.
 """
-import re
 from datetime import date
 from typing import Optional
 
@@ -22,13 +21,10 @@ from sqlalchemy.orm import Session, selectinload
 
 router = APIRouter(prefix="/palmares", tags=["Palmarés"])
 
-# "Final", "La final", "Gran final"... pero no semifinal, cuartos, "1/8 de final", etc.
-_NO_FINAL = re.compile(r"semi|cuartos|octavos|dieciseis|1/|3er|tercer|reclasif|zona", re.I)
-
-
+# Es final solo si la instancia es exactamente "Final" (sin importar mayúsculas ni
+# espacios). "32avos de final", "Semifinal", etc. no entran.
 def _es_final(instancia: str) -> bool:
-    t = (instancia or "").strip().lower()
-    return "final" in t and not _NO_FINAL.search(t)
+    return (instancia or "").strip().lower() == "final"
 
 
 def _k(s: Optional[str]) -> str:
