@@ -39,6 +39,23 @@ class DT(Base):
     equipo = relationship("Equipo", back_populates="dts")
 
 
+class Titulo(Base):
+    """Título cargado A MANO en el palmarés (ej. campeón de la tabla anual,
+    o un campeonato del que no viste la final). Los títulos que salen de
+    finales cargadas NO se guardan acá: se calculan solos (ver palmares.py)."""
+    __tablename__ = "palmares_titulos"
+    __table_args__ = (
+        UniqueConstraint("equipo_id", "competicion", "temporada", name="uq_palmares_titulo_unico"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    equipo_id = Column(Integer, ForeignKey("equipos.id", ondelete="CASCADE"), nullable=False, index=True)
+    competicion = Column(String(150), nullable=False)
+    temporada = Column(String(20), nullable=True)
+    fecha = Column(Date, nullable=True)
+    nota = Column(String(200), nullable=True)
+
+
 class Clasico(Base):
     """Enfrentamiento clásico registrado entre dos clubes (ej. "Superclásico").
     Los partidos NO guardan nada del clásico: se reconocen solos comparando los

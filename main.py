@@ -7,6 +7,7 @@ from datetime import date, datetime
 from typing import List, Optional
 
 import dts
+import palmares
 import models
 import schemas
 from database import engine, get_db
@@ -117,6 +118,7 @@ app.add_middleware(
 )
 
 app.include_router(dts.router)
+app.include_router(palmares.router)
 
 # Comprime las respuestas (JSON de partidos, index.html): bajan mucho de tamaño
 # y llegan más rápido, sobre todo desde el celular.
