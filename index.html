@@ -1713,7 +1713,8 @@
                                 </button>` : '';
 
                 contenedor.innerHTML += `
-                    <div class="bg-slate-800 border ${p.clasico ? 'border-amber-400/50' : 'border-slate-700'} rounded-xl p-4 shadow-lg flex flex-col">
+                    <div class="relative overflow-hidden border ${p.campeon ? 'border-violet-400/60 bg-gradient-to-b from-violet-500/15 to-slate-800 ring-1 ring-violet-400/20' : (p.clasico ? 'bg-slate-800 border-amber-400/50' : 'bg-slate-800 border-slate-700')} rounded-xl p-4 shadow-lg flex flex-col">
+                        ${p.campeon ? `<div class="-mx-4 -mt-4 mb-3 px-4 py-1.5 bg-violet-500/20 border-b border-violet-400/30 text-[11px] font-bold uppercase tracking-wide text-violet-200 flex items-center justify-center gap-2 text-center" title="Final: campeón"><i class="fa-solid fa-trophy text-violet-300"></i><span class="truncate">Campeón: ${esc(p.campeon)}</span><i class="fa-solid fa-star text-violet-300"></i></div>` : ''}
                         <div class="flex justify-between items-start gap-2 mb-3">
                             <div class="min-w-0">
                                 <span class="text-[10px] font-semibold uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">${p.competicion}${p.temporada ? ' ' + p.temporada : ''}</span>

@@ -155,3 +155,27 @@ def borrar_titulo(titulo_id: int, db: Session = Depends(get_db)):
     db.delete(t)
     db.commit()
     return None
+
+
+def anotar_campeon(db: Session, partidos) -> None:
+    """Le pega a cada partido `campeon` (nombre del club o None); lo lee
+    PartidoResponse para resaltar las finales con ganador. En una llave de
+    ida y vuelta solo la VUELTA lleva el campeón (decide el global)."""
+    partidos = [p for p in partidos if p is not None]
+    finales = [p for p in partidos if _es_final(p.instancia)]
+    for p in partidos:
+        p.campeon = None
+    if not finales:
+        return
+    ids = [p.id for p in finales]
+    es_ida = {r[0] for r in db.query(models.Partido.partido_ida_id)
+              .filter(models.Partido.partido_ida_id.in_(ids)).all()}
+    for p in finales:
+        if p.id in es_ida:
+            continue
+        por_id = {}
+        if p.partido_ida_id:
+            ida = db.query(models.Partido).filter(models.Partido.id == p.partido_ida_id).first()
+            if ida:
+                por_id[ida.id] = ida
+        p.campeon = _campeon_de_final(p, por_id)

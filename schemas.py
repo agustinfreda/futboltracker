@@ -188,6 +188,9 @@ class PartidoResponse(PartidoBase):
     # Si los dos equipos coinciden con un clásico registrado: {"id", "nombre"}.
     # Se calcula al responder (en cualquier orden local/visitante), no se guarda.
     clasico: Optional[dict] = None
+    # Si es una final con ganador: nombre del club campeón (se calcula al responder,
+    # ver palmares.anotar_campeon). None si no es final o no se puede determinar.
+    campeon: Optional[str] = None
 
     class Config:
         from_attributes = True

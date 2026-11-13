@@ -1820,6 +1820,7 @@ def anotar_clasicos(db: Session, partidos) -> None:
     for p in partidos:
         c = idx.get(_clave_par(p.equipo_local, p.equipo_visitante)) if idx else None
         p.clasico = {"id": c.id, "nombre": c.nombre} if c else None
+    palmares.anotar_campeon(db, partidos)  # final con ganador -> p.campeon
 
 
 def _cond_par(c: "models.Clasico"):
